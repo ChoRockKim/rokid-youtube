@@ -34,12 +34,29 @@ class YouTubeNetworkTest {
     }
 
     @Test
-    fun categoriesLoad() = runBlocking {
-        val categories = YouTubeRepository.categories()
-        println("categories: $categories")
-        val first = categories.first { it.kioskId != "live" }
-        val items = YouTubeRepository.kiosk(first.kioskId)
-        println("${first.kioskId}: ${items.size} items, first = ${items.firstOrNull()?.title}")
+    fun popularLoads() = runBlocking {
+        val items = YouTubeRepository.popular()
+        println("popular: ${items.size} items, first = ${items.firstOrNull()?.title}")
+        assertTrue(items.isNotEmpty())
+    }
+
+    @Test
+    fun relatedVideosFeedRecommendations() = runBlocking {
+        val info = YouTubeRepository.stream("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        val related = YouTubeRepository.related(info)
+        println("related: ${related.size}, first = ${related.firstOrNull()?.title}")
+        assertTrue(related.isNotEmpty())
+    }
+
+    @Test
+    fun channelFeedHasNewestUploads() {
+        // Same path as the subscription feed, without needing a signed-in account.
+        val items = org.schabi.newpipe.extractor.feed.FeedInfo.getInfo(
+            org.schabi.newpipe.extractor.ServiceList.YouTube,
+            "https://www.youtube.com/channel/UCuAXFkgsw1L7xaCfnd5JJOw"
+        ).relatedItems
+        val newest = YouTubeAccountApi.newestFirst(items)
+        println("channel feed: ${items.size}, newest = ${newest.firstOrNull()?.name} ${newest.firstOrNull()?.uploadDate}")
         assertTrue(items.isNotEmpty())
     }
 

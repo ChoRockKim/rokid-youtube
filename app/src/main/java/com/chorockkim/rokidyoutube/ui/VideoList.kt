@@ -103,9 +103,9 @@ class VideoList(context: Context) : RecyclerView(context) {
                     }
                 )
             }
-            root.addView(thumbFrame, LinearLayout.LayoutParams(-1, dp(72)))
-            root.addView(title, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(5) })
-            root.addView(uploader, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(3) })
+            root.addView(thumbFrame, LinearLayout.LayoutParams(-1, dp(68)))
+            root.addView(title, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+            root.addView(uploader, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
         }
 
         fun bind(item: VideoItem, isSelected: Boolean) {

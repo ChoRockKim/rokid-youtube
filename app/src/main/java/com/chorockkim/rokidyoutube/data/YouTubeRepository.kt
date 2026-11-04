@@ -21,29 +21,23 @@ data class VideoItem(
     val isLive: Boolean
 )
 
-data class Category(val kioskId: String, val label: String)
-
 /** Thin coroutine wrapper over NewPipeExtractor's YouTube service. */
 object YouTubeRepository {
     private val service get() = ServiceList.YouTube
 
-    /** Kiosks shown as top-bar chips, in RokidPipe's order; "Trending" itself is broken upstream. */
-    private val CATEGORY_LABELS = linkedMapOf(
-        "trending_gaming" to "게임",
-        "trending_music" to "음악",
-        "trending_movies_and_shows" to "영화",
-        "trending_podcasts_episodes" to "팟캐스트",
-        "live" to "라이브"
-    )
+    /** Video kiosks mixed into "popular" when there is no watch history yet. */
+    private val POPULAR_KIOSKS = listOf("trending_music", "trending_gaming", "trending_movies_and_shows")
 
-    fun categories(): List<Category> {
+    /** Popular videos across YouTube's trending sections, interleaved. */
+    suspend fun popular(): List<VideoItem> = withContext(Dispatchers.IO) {
         val available = runCatching { service.kioskList.availableKiosks }.getOrDefault(emptySet())
-        return CATEGORY_LABELS.filterKeys { it in available }.map { (id, label) -> Category(id, label) }
-    }
-
-    suspend fun kiosk(kioskId: String): List<VideoItem> = withContext(Dispatchers.IO) {
-        val url = service.kioskList.getListLinkHandlerFactoryByType(kioskId).fromId(kioskId).url
-        KioskInfo.getInfo(service, url).relatedItems.toVideoItems()
+        val lists = POPULAR_KIOSKS.filter { it in available }.map { id ->
+            runCatching {
+                val url = service.kioskList.getListLinkHandlerFactoryByType(id).fromId(id).url
+                KioskInfo.getInfo(service, url).relatedItems.toVideoItems()
+            }.getOrDefault(emptyList())
+        }
+        interleave(lists).distinctBy { it.url }
     }
 
     suspend fun search(query: String): List<VideoItem> = withContext(Dispatchers.IO) {
@@ -55,21 +49,30 @@ object YouTubeRepository {
         StreamInfo.getInfo(service, url)
     }
 
-    private fun List<InfoItem>.toVideoItems(): List<VideoItem> =
-        filterIsInstance<StreamInfoItem>().map { item ->
-            VideoItem(
-                url = item.url,
-                title = item.name,
-                uploader = item.uploaderName.orEmpty(),
-                durationSeconds = item.duration,
-                viewCount = item.viewCount,
-                thumbnailUrl = pickThumbnail(item.thumbnails),
-                isLive = item.streamType == StreamType.LIVE_STREAM ||
-                    item.streamType == StreamType.AUDIO_LIVE_STREAM
-            )
-        }
+    fun related(info: StreamInfo): List<VideoItem> = info.relatedItems.toVideoItems()
 
-    /** Smallest thumbnail that is still at least as wide as the list cell (124dp). */
+    fun <T> interleave(lists: List<List<T>>): List<T> {
+        val out = mutableListOf<T>()
+        val longest = lists.maxOfOrNull { it.size } ?: 0
+        for (i in 0 until longest) lists.forEach { list -> list.getOrNull(i)?.let(out::add) }
+        return out
+    }
+
+    private fun List<InfoItem>.toVideoItems(): List<VideoItem> =
+        filterIsInstance<StreamInfoItem>().map(::toVideoItem)
+
+    fun toVideoItem(item: StreamInfoItem) = VideoItem(
+        url = item.url,
+        title = item.name,
+        uploader = item.uploaderName.orEmpty(),
+        durationSeconds = item.duration,
+        viewCount = item.viewCount,
+        thumbnailUrl = pickThumbnail(item.thumbnails),
+        isLive = item.streamType == StreamType.LIVE_STREAM ||
+            item.streamType == StreamType.AUDIO_LIVE_STREAM
+    )
+
+    /** Smallest thumbnail that is still at least as wide as a grid card. */
     private fun pickThumbnail(images: List<Image>): String? {
         val sized = images.filter { it.width > 0 }.sortedBy { it.width }
         return (sized.firstOrNull { it.width >= 240 } ?: sized.lastOrNull() ?: images.firstOrNull())?.url

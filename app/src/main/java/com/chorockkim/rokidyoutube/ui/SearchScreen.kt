@@ -138,7 +138,7 @@ class SearchScreen(
                 if (cursor == 0) {
                     showKeyboard()
                 } else {
-                    results.items.getOrNull(cursor - 1)?.let { navigator.openPlayer(it.url, it.title) }
+                    results.items.getOrNull(cursor - 1)?.let { navigator.openPlayer(it) }
                 }
                 true
             }

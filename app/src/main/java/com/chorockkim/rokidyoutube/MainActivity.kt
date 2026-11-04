@@ -17,7 +17,9 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.chorockkim.rokidyoutube.data.VideoItem
 import com.chorockkim.rokidyoutube.data.YouTubeRepository
+import com.chorockkim.rokidyoutube.ui.AccountScreen
 import com.chorockkim.rokidyoutube.ui.GlassesInput
 import com.chorockkim.rokidyoutube.ui.HomeScreen
 import com.chorockkim.rokidyoutube.ui.Hud
@@ -34,6 +36,8 @@ import com.chorockkim.rokidyoutube.ui.SearchScreen
  */
 class MainActivity : ComponentActivity(), Navigator {
     private lateinit var band: FrameLayout
+    private lateinit var home: HomeScreen
+    private val app get() = application as RokidYouTubeApp
     /** Holds the current screen; hidden from accessibility so [ringTarget] is the only node. */
     private lateinit var screenHost: FrameLayout
     private lateinit var ringTarget: RingTarget
@@ -65,11 +69,8 @@ class MainActivity : ComponentActivity(), Navigator {
         band.addView(ringTarget, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
 
-        push(
-            HomeScreen(this, this, lifecycleScope, YouTubeRepository.categories()) {
-                YouTubeRepository.kiosk(it.kioskId)
-            }
-        )
+        home = HomeScreen(this, this, lifecycleScope, homeTabs()) { if (app.auth.isSignedIn) "계정" else "로그인" }
+        push(home)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = dispatchAction(GlassesInput.Action.BACK)
@@ -121,9 +122,32 @@ class MainActivity : ComponentActivity(), Navigator {
         push(SearchScreen(this, this, lifecycleScope) { YouTubeRepository.search(it) })
     }
 
-    override fun openPlayer(url: String, title: String) {
-        push(PlayerScreen(this, this, lifecycleScope, url, title))
+    override fun openPlayer(video: VideoItem) {
+        push(PlayerScreen(this, this, lifecycleScope, video, app.history))
     }
+
+    override fun openAccount() {
+        push(
+            AccountScreen(
+                this, this, lifecycleScope, app.auth,
+                clearHistory = { app.history.clear() },
+                onAccountChanged = { home.reload() }
+            )
+        )
+    }
+
+    /** Personal feeds instead of YouTube categories (see README for what each one uses). */
+    private fun homeTabs() = listOf(
+        HomeScreen.Tab("추천", "아직 추천할 게 없어요", reloadOnReturn = true) {
+            // Built from what was watched on these glasses; popular videos until there is history.
+            app.history.recommendations().ifEmpty { YouTubeRepository.popular() }
+        },
+        HomeScreen.Tab("이어보기", "이어 볼 영상이 없어요", reloadOnReturn = true) {
+            app.history.continueWatching()
+        },
+        HomeScreen.Tab("구독", "구독 채널의 새 영상이 없어요") { app.accountApi.subscriptionFeed() },
+        HomeScreen.Tab("좋아요", "좋아요한 영상이 없어요") { app.accountApi.likedVideos() }
+    )
 
     override fun onStop() {
         super.onStop()

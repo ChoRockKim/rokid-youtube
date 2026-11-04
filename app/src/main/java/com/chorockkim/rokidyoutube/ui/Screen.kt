@@ -21,7 +21,8 @@ interface Screen {
 /** What screens can ask the host activity to do. */
 interface Navigator {
     fun openSearch()
-    fun openPlayer(url: String, title: String)
+    fun openPlayer(video: com.chorockkim.rokidyoutube.data.VideoItem)
+    fun openAccount()
     fun back()
     fun startVoiceSearch(onResult: (String) -> Unit)
 }

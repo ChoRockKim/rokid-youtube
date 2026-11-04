@@ -1,9 +1,18 @@
 import com.android.build.api.dsl.ApplicationExtension
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.paparazzi)
 }
+
+// Your own Google OAuth client ("TVs and Limited Input devices"), see README. Kept out of git:
+// put googleClientId / googleClientSecret in local.properties or pass them as -P properties.
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+fun secret(name: String): String =
+    (localProps.getProperty(name) ?: providers.gradleProperty(name).orNull ?: "").replace("\"", "")
 
 kotlin {
     jvmToolchain(21)
@@ -20,6 +29,9 @@ configure<ApplicationExtension> {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        buildConfigField("String", "GOOGLE_CLIENT_ID", "\"${secret("googleClientId")}\"")
+        buildConfigField("String", "GOOGLE_CLIENT_SECRET", "\"${secret("googleClientSecret")}\"")
     }
 
     buildTypes {

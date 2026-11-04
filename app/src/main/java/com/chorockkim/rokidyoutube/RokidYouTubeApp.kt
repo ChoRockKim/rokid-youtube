@@ -5,7 +5,12 @@ import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import com.chorockkim.rokidyoutube.auth.GoogleAuth
+import com.chorockkim.rokidyoutube.auth.PrefsTokenStore
+import com.chorockkim.rokidyoutube.data.WatchHistory
+import com.chorockkim.rokidyoutube.data.YouTubeAccountApi
 import com.chorockkim.rokidyoutube.net.OkHttpDownloader
+import java.io.File
 import com.chorockkim.rokidyoutube.potoken.PoTokenProviderImpl
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.localization.ContentCountry
@@ -25,6 +30,17 @@ class RokidYouTubeApp : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader = ImageLoader.Builder(this)
         .components { add(OkHttpNetworkFetcherFactory(callFactory = OkHttpDownloader.get().client)) }
         .build()
+
+    val auth by lazy {
+        GoogleAuth(
+            BuildConfig.GOOGLE_CLIENT_ID,
+            BuildConfig.GOOGLE_CLIENT_SECRET,
+            PrefsTokenStore(this),
+            { OkHttpDownloader.get().client }
+        )
+    }
+    val accountApi by lazy { YouTubeAccountApi(OkHttpDownloader.get().client) { auth.accessToken() } }
+    val history by lazy { WatchHistory(File(filesDir, "watch_history.json")) }
 
     companion object {
         lateinit var instance: RokidYouTubeApp

@@ -12,6 +12,8 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import com.chorockkim.rokidyoutube.data.VideoItem
+import com.chorockkim.rokidyoutube.data.WatchHistory
 import com.chorockkim.rokidyoutube.data.YouTubeRepository
 import com.chorockkim.rokidyoutube.player.StreamSelector
 import com.chorockkim.rokidyoutube.player.YoutubeMediaSources
@@ -36,8 +38,9 @@ class PlayerScreen(
     context: Context,
     private val navigator: Navigator,
     private val scope: CoroutineScope,
-    private val url: String,
-    title: String,
+    private val video: VideoItem,
+    /** Watch history for "추천" / "이어보기"; null in snapshot tests. */
+    private val history: WatchHistory? = null,
     /** null in snapshot tests: no ExoPlayer, just the layout. */
     private val playerFactory: (() -> ExoPlayer)? = { ExoPlayer.Builder(context).build() }
 ) : Screen {
@@ -56,7 +59,7 @@ class PlayerScreen(
 
     private val controls = FrameLayout(context)
     private val titleView = Hud.text(context, 14f, bold = true).apply {
-        text = title
+        text = video.title
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
         setPadding(dp(12), dp(8), dp(12), dp(14))
@@ -92,9 +95,12 @@ class PlayerScreen(
 
     private val handler = Handler(Looper.getMainLooper())
     private val hideControls = Runnable { setControlsVisible(false) }
+    private var ticks = 0
     private val tick = object : Runnable {
         override fun run() {
             updateProgress()
+            // Save the position every ~5s so "이어보기" survives the app being killed.
+            if (++ticks % 10 == 0) savePosition()
             handler.postDelayed(this, 500)
         }
     }
@@ -169,10 +175,12 @@ class PlayerScreen(
 
     override fun onHidden() {
         handler.removeCallbacksAndMessages(null)
+        savePosition()
         player?.pause()
     }
 
     override fun onDestroy() {
+        savePosition()
         loadJob?.cancel()
         handler.removeCallbacksAndMessages(null)
         videoView.player = null
@@ -184,24 +192,26 @@ class PlayerScreen(
         setStatus("불러오는 중…")
         loadJob = scope.launch {
             try {
-                val streamInfo = YouTubeRepository.stream(url)
+                val streamInfo = YouTubeRepository.stream(video.url)
                 info = streamInfo
                 titleView.text = streamInfo.name
-                play(streamInfo, keepPosition = false)
+                val resumeAt = history?.all?.firstOrNull { it.video.url == video.url }
+                    ?.takeIf { it.inProgress }?.positionMs ?: 0L
+                history?.recordWatch(video, YouTubeRepository.related(streamInfo))
+                play(streamInfo, startAtMs = resumeAt)
             } catch (e: Exception) {
                 setStatus("영상을 불러오지 못했어요\n${e.javaClass.simpleName}")
             }
         }
     }
 
-    private fun play(streamInfo: StreamInfo, keepPosition: Boolean) {
+    private fun play(streamInfo: StreamInfo, startAtMs: Long) {
         val p = player ?: return
         val selection = StreamSelector.select(streamInfo, maxHeight)
         availableHeights = selection.availableHeights
         qualityButton.text = selection.video?.let { "${StreamSelector.heightOf(it)}p" } ?: "음성"
-        val resumeAt = if (keepPosition) p.currentPosition else 0L
         try {
-            p.setMediaSource(mediaSources.build(streamInfo, selection), resumeAt)
+            p.setMediaSource(mediaSources.build(streamInfo, selection), startAtMs)
             p.prepare()
             p.playWhenReady = true
         } catch (e: YoutubeMediaSources.ResolverException) {
@@ -229,7 +239,7 @@ class PlayerScreen(
         val current = availableHeights.firstOrNull { it <= maxHeight } ?: availableHeights.last()
         val index = availableHeights.indexOf(current)
         maxHeight = availableHeights[(index + 1) % availableHeights.size]
-        play(streamInfo, keepPosition = true)
+        play(streamInfo, startAtMs = player?.currentPosition ?: 0L)
     }
 
     private fun setStatus(text: String?) {
@@ -251,6 +261,12 @@ class PlayerScreen(
     private fun moveRail(index: Int) {
         railCursor = (index + rail.size) % rail.size
         rail.forEachIndexed { i, (button, _) -> button.isSelected = i == railCursor }
+    }
+
+    private fun savePosition() {
+        val p = player ?: return
+        if (info == null) return
+        history?.updatePosition(video.url, p.currentPosition, p.duration.coerceAtLeast(0))
     }
 
     private fun updateProgress() {

@@ -10,7 +10,6 @@ import app.cash.paparazzi.DeviceConfig
 import app.cash.paparazzi.Paparazzi
 import com.android.resources.Density
 import com.android.resources.ScreenOrientation
-import com.chorockkim.rokidyoutube.data.Category
 import com.chorockkim.rokidyoutube.data.VideoItem
 import com.chorockkim.rokidyoutube.ui.Hud.dp
 import kotlinx.coroutines.CoroutineScope
@@ -44,7 +43,8 @@ class HudSnapshotTest {
 
     private val navigator = object : Navigator {
         override fun openSearch() {}
-        override fun openPlayer(url: String, title: String) {}
+        override fun openPlayer(video: VideoItem) {}
+        override fun openAccount() {}
         override fun back() {}
         override fun startVoiceSearch(onResult: (String) -> Unit) {}
     }
@@ -59,24 +59,23 @@ class HudSnapshotTest {
         VideoItem("u7", "침착맨 삼국지 정주행 3부", "침착맨", 7_260, 1_200_000, null, false)
     )
 
-    private val categories = listOf(
-        Category("trending_gaming", "게임"),
-        Category("trending_music", "음악"),
-        Category("trending_movies_and_shows", "영화"),
-        Category("trending_podcasts_episodes", "팟캐스트"),
-        Category("live", "라이브")
+    private fun tabs(items: List<VideoItem>) = listOf(
+        HomeScreen.Tab("추천", "") { items },
+        HomeScreen.Tab("이어보기", "") { emptyList() },
+        HomeScreen.Tab("구독", "") { emptyList() },
+        HomeScreen.Tab("좋아요", "") { emptyList() }
     )
 
     @Test
     fun home_chipSelected() {
-        val home = HomeScreen(context, navigator, scope, categories) { sampleVideos }
+        val home = HomeScreen(context, navigator, scope, tabs(sampleVideos)) { "로그인" }
         home.list.thumbnailBinder = ::fakeThumbnail
         snapshot(home.view)
     }
 
     @Test
     fun home_rowSelected() {
-        val home = HomeScreen(context, navigator, scope, categories) { sampleVideos }
+        val home = HomeScreen(context, navigator, scope, tabs(sampleVideos)) { "계정" }
         home.list.thumbnailBinder = ::fakeThumbnail
         repeat(10) { home.onAction(GlassesInput.Action.NEXT) } // 6 chips -> 5th card (2nd row)
         snapshot(home.view)
@@ -101,10 +100,7 @@ class HudSnapshotTest {
 
     @Test
     fun player_controls() {
-        val player = PlayerScreen(
-            context, navigator, scope, "u3",
-            "Rick Astley - Never Gonna Give You Up (Official Video)", playerFactory = null
-        )
+        val player = PlayerScreen(context, navigator, scope, sampleVideos[2], playerFactory = null)
         // layoutlib cannot draw a SurfaceView; stand in a gradient for the video frame.
         player.videoView.visibility = View.INVISIBLE
         player.view.background = gradient(2)
@@ -114,12 +110,27 @@ class HudSnapshotTest {
 
     @Test
     fun player_controlsHidden() {
-        val player = PlayerScreen(context, navigator, scope, "u3", "Rick Astley", playerFactory = null)
+        val player = PlayerScreen(context, navigator, scope, sampleVideos[2], playerFactory = null)
         // layoutlib cannot draw a SurfaceView; stand in a gradient for the video frame.
         player.videoView.visibility = View.INVISIBLE
         player.view.background = gradient(2)
         player.setControlsVisible(false)
         snapshot(player.view)
+    }
+
+    @Test
+    fun account_deviceCode() {
+        val auth = com.chorockkim.rokidyoutube.auth.GoogleAuth(
+            "id", "secret",
+            object : com.chorockkim.rokidyoutube.auth.GoogleAuth.TokenStore {
+                override fun load() = null
+                override fun save(tokens: com.chorockkim.rokidyoutube.auth.GoogleAuth.Tokens?) {}
+            },
+            { error("no network in snapshots") }
+        )
+        val account = AccountScreen(context, navigator, scope, auth, {}, {})
+        account.showCodeForPreview("KQW-RZTD")
+        snapshot(account.view)
     }
 
     /** Full 480x640 glasses display; black above the band is transparent on the glasses. */
