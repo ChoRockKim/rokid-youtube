@@ -45,12 +45,44 @@ class MainActivity : ComponentActivity(), Navigator {
     private val input = GlassesInput()
     private var recognizer: SpeechRecognizer? = null
     private var pendingVoice: ((String) -> Unit)? = null
+    private lateinit var offlineBanner: android.widget.TextView
+    private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         if (it) listen() else toast("마이크 권한이 필요해요")
     }
 
+    /**
+     * Fits the 480dp x 282dp band to the glasses display whatever its real density is: the
+     * density is overridden so the band is exactly as wide as the screen (or as tall, if the
+     * screen is very wide). System font scaling is ignored so text cannot overflow the band.
+     */
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(newBase)
+        val metrics = newBase.resources.displayMetrics
+        val (w, h) = realScreenSize(newBase, metrics.widthPixels, metrics.heightPixels)
+        val scale = minOf(w / Hud.BAND_WIDTH_DP.toFloat(), h / Hud.BAND_HEIGHT_DP.toFloat())
+        applyOverrideConfiguration(android.content.res.Configuration().apply {
+            densityDpi = (scale * android.util.DisplayMetrics.DENSITY_DEFAULT).toInt().coerceAtLeast(1)
+            fontScale = 1f
+        })
+    }
+
+    private fun realScreenSize(context: android.content.Context, fallbackW: Int, fallbackH: Int): Pair<Int, Int> {
+        val wm = context.getSystemService(android.view.WindowManager::class.java) ?: return fallbackW to fallbackH
+        return if (android.os.Build.VERSION.SDK_INT >= 30) {
+            val b = wm.maximumWindowMetrics.bounds
+            b.width() to b.height()
+        } else {
+            val m = android.util.DisplayMetrics()
+            @Suppress("DEPRECATION") wm.defaultDisplay.getRealMetrics(m)
+            m.widthPixels to m.heightPixels
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Keep the glasses display on while the app is open, not only during playback.
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         band = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         root.addView(
@@ -67,7 +99,18 @@ class MainActivity : ComponentActivity(), Navigator {
         // R08 ring via R08 Access Bridge: see RingTarget.
         ringTarget = RingTarget(this, ::dispatchAction)
         band.addView(ringTarget, FrameLayout.LayoutParams(-1, -1))
+        offlineBanner = Hud.text(this, 13f, bold = true).apply {
+            text = "인터넷에 연결되어 있지 않아요"
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#FF5252"))
+            setBackgroundColor(Color.BLACK)
+            setPadding(dp(8), dp(4), dp(8), dp(4))
+            importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            visibility = android.view.View.GONE
+        }
+        band.addView(offlineBanner, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
         setContentView(root)
+        watchNetwork()
 
         home = HomeScreen(this, this, lifecycleScope, homeTabs()) { if (app.auth.isSignedIn) "계정" else "로그인" }
         push(home)
@@ -159,7 +202,35 @@ class MainActivity : ComponentActivity(), Navigator {
         stack.lastOrNull()?.onShown()
     }
 
+    // region Offline notice
+
+    private fun watchNetwork() {
+        val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return
+        fun show(online: Boolean) = runOnUiThread {
+            offlineBanner.visibility = if (online) android.view.View.GONE else android.view.View.VISIBLE
+        }
+        fun hasInternet(caps: android.net.NetworkCapabilities?) =
+            caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+        fun refresh() = show(hasInternet(cm.getNetworkCapabilities(cm.activeNetwork)))
+        val callback = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) = refresh()
+            // Default-network callback: losing it means there is no network at all.
+            override fun onLost(network: android.net.Network) = show(false)
+            override fun onCapabilitiesChanged(
+                network: android.net.Network, caps: android.net.NetworkCapabilities
+            ) = show(hasInternet(caps))
+        }
+        cm.registerDefaultNetworkCallback(callback)
+        networkCallback = callback
+        refresh()
+    }
+
+    // endregion
+
     override fun onDestroy() {
+        networkCallback?.let {
+            getSystemService(android.net.ConnectivityManager::class.java)?.unregisterNetworkCallback(it)
+        }
         stack.forEach { it.onDestroy() }
         recognizer?.destroy()
         super.onDestroy()

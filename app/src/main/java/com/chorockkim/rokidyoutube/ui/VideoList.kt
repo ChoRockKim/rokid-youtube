@@ -8,15 +8,16 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import coil3.load
 import com.chorockkim.rokidyoutube.data.VideoItem
 import com.chorockkim.rokidyoutube.ui.Hud.dp
 
 /**
- * Grid of video cards, 3 per row, so two rows (6 videos) fit the 480x282 band at once. Has its
- * own "selected card" (no Android focus); swipe order is row by row, left to right.
+ * Vertical list of wide video cards (thumbnail left, title and channel right), one per row,
+ * scrolling up and down only. Has its own "selected card" (no Android focus); swipe order is
+ * top to bottom.
  */
 class VideoList(context: Context) : RecyclerView(context) {
     private val adapterImpl = Adapter()
@@ -36,9 +37,8 @@ class VideoList(context: Context) : RecyclerView(context) {
             if (old >= 0) adapterImpl.notifyItemChanged(old)
             if (value >= 0) {
                 adapterImpl.notifyItemChanged(value)
-                // Keep the selected card's row at the top so the row below stays visible too.
-                val rowStart = value - value % COLUMNS
-                (layoutManager as GridLayoutManager).scrollToPositionWithOffset(rowStart, 0)
+                // Keep the selected card at the top so the next cards stay visible below it.
+                (layoutManager as LinearLayoutManager).scrollToPositionWithOffset(value, 0)
             }
         }
 
@@ -48,7 +48,7 @@ class VideoList(context: Context) : RecyclerView(context) {
     }
 
     init {
-        layoutManager = GridLayoutManager(context, COLUMNS)
+        layoutManager = LinearLayoutManager(context, VERTICAL, false)
         adapter = adapterImpl
         itemAnimator = null
         overScrollMode = OVER_SCROLL_NEVER
@@ -76,8 +76,8 @@ class VideoList(context: Context) : RecyclerView(context) {
             setBackgroundColor(Hud.SCRIM)
             setPadding(dp(3), dp(1), dp(3), dp(1))
         }
-        private val title = Hud.text(context, 13f, bold = true).apply {
-            maxLines = 1
+        private val title = Hud.text(context, 14f, bold = true).apply {
+            maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
         }
         private val uploader = Hud.text(context, 11f, Hud.GREY).apply {
@@ -86,11 +86,12 @@ class VideoList(context: Context) : RecyclerView(context) {
         }
 
         init {
-            // 2 rows x (116 + 2) = 236dp: fits under the 44dp chip row of the 282dp band.
+            // 3 cards x (76 + 2) = 234dp: fits under the 44dp chip row of the 282dp band.
             root.layoutParams = RecyclerView.LayoutParams(LayoutParams.MATCH_PARENT, dp(CARD_HEIGHT_DP)).apply {
                 setMargins(dp(2), dp(1), dp(2), dp(1))
             }
-            root.orientation = LinearLayout.VERTICAL
+            root.orientation = LinearLayout.HORIZONTAL
+            root.gravity = Gravity.CENTER_VERTICAL
             root.setPadding(dp(4), dp(4), dp(4), dp(4))
             root.background = Hud.outline(context)
 
@@ -103,9 +104,14 @@ class VideoList(context: Context) : RecyclerView(context) {
                     }
                 )
             }
-            root.addView(thumbFrame, LinearLayout.LayoutParams(-1, dp(68)))
-            root.addView(title, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
-            root.addView(uploader, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(2) })
+            // 16:9 thumbnail.
+            root.addView(thumbFrame, LinearLayout.LayoutParams(dp(120), dp(68)))
+            val texts = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(title, LinearLayout.LayoutParams(-1, -2))
+                addView(uploader, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+            }
+            root.addView(texts, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
         }
 
         fun bind(item: VideoItem, isSelected: Boolean) {
@@ -121,7 +127,6 @@ class VideoList(context: Context) : RecyclerView(context) {
     }
 
     companion object {
-        const val COLUMNS = 3
-        const val CARD_HEIGHT_DP = 116
+        const val CARD_HEIGHT_DP = 76
     }
 }

@@ -16,7 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
- * Home: a row of chips ([검색] + personal tabs + account) above a 3-column video grid.
+ * Home: a row of chips ([검색] + personal tabs + account) above a vertical list of video cards.
  * Swipe walks chips first, then the cards; tap opens the chip or plays the card.
  */
 class HomeScreen(
