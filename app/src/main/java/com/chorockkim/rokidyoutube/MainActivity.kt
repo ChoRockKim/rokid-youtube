@@ -81,8 +81,9 @@ class MainActivity : ComponentActivity(), Navigator {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Keep the glasses display on while the app is open, not only during playback.
-        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Keep the glasses display on while the app is open (the player lets it time out while
+        // the user has paused, see setKeepScreenOn).
+        setKeepScreenOn(true)
         // Volume keys always change the media volume, also while nothing is playing (otherwise
         // they change the ring / notification volume there).
         volumeControlStream = android.media.AudioManager.STREAM_MUSIC
@@ -150,6 +151,7 @@ class MainActivity : ComponentActivity(), Navigator {
         }
         stack.addLast(screen)
         screenHost.addView(screen.view, FrameLayout.LayoutParams(-1, -1))
+        setKeepScreenOn(true)
         screen.onShown()
         ringTarget.requestFocus()
     }
@@ -165,9 +167,15 @@ class MainActivity : ComponentActivity(), Navigator {
         screenHost.removeView(top.view)
         stack.last().let {
             screenHost.addView(it.view, FrameLayout.LayoutParams(-1, -1))
+            setKeepScreenOn(true)
             it.onShown()
         }
         ringTarget.requestFocus()
+    }
+
+    override fun setKeepScreenOn(on: Boolean) {
+        val flag = android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        if (on) window.addFlags(flag) else window.clearFlags(flag)
     }
 
     override fun exitApp() {

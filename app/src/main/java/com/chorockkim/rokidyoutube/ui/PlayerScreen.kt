@@ -54,7 +54,6 @@ class PlayerScreen(
 ) : Screen {
     override val view = FrameLayout(context).apply {
         setBackgroundColor(Color.BLACK)
-        keepScreenOn = true
     }
 
     /**
@@ -219,6 +218,9 @@ class PlayerScreen(
     }
 
     override fun onShown() {
+        // Coming back to a player that was paused (by the user, or when the app went to the
+        // background): it stays paused, so the display may time out.
+        player?.let { userPaused = !it.playWhenReady }
         if (player == null && playerFactory != null) {
             player = playerFactory.invoke().also { p ->
                 p.setVideoTextureView(textureView)
@@ -242,6 +244,7 @@ class PlayerScreen(
                         if (state == Player.STATE_READY) setStatus(null)
                         // No controls pop up at the end either; just say so.
                         if (state == Player.STATE_ENDED) setStatus("끝났어요\n탭하면 메뉴")
+                        updateScreenOn()
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
@@ -253,6 +256,7 @@ class PlayerScreen(
         }
         handler.removeCallbacks(tick)
         handler.post(tick)
+        updateScreenOn()
     }
 
     override fun onHidden() {
@@ -305,6 +309,16 @@ class PlayerScreen(
         val p = player ?: return
         if (p.playbackState == Player.STATE_ENDED) p.seekTo(0)
         p.playWhenReady = !p.playWhenReady
+        userPaused = !p.playWhenReady
+        updateScreenOn()
+    }
+
+    /** Paused with [멈춤] (or ended): let the display time out. Loading/buffering keeps it on. */
+    private var userPaused = false
+
+    private fun updateScreenOn() {
+        val ended = player?.playbackState == Player.STATE_ENDED
+        navigator.setKeepScreenOn(!userPaused && !ended)
     }
 
     private fun seekBy(deltaMs: Long) {

@@ -26,5 +26,7 @@ interface Navigator {
     fun back()
     /** Closes the whole app (not just this screen) and removes it from recents. */
     fun exitApp()
+    /** Screen on (default) or allowed to time out, e.g. while the video is paused. */
+    fun setKeepScreenOn(on: Boolean)
     fun startVoiceSearch(onResult: (String) -> Unit)
 }
