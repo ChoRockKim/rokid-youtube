@@ -36,6 +36,7 @@ class LoginFlowSnapshotTest {
         override fun openSearch() {}
         override fun openPlayer(video: VideoItem) {}
         override fun openAccount() {}
+        override fun exitApp() {}
         override fun back() {}
         override fun startVoiceSearch(onResult: (String) -> Unit) {}
     }

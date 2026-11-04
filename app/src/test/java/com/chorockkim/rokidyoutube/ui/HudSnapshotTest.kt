@@ -45,6 +45,7 @@ class HudSnapshotTest {
         override fun openSearch() {}
         override fun openPlayer(video: VideoItem) {}
         override fun openAccount() {}
+        override fun exitApp() {}
         override fun back() {}
         override fun startVoiceSearch(onResult: (String) -> Unit) {}
     }
@@ -145,6 +146,37 @@ class HudSnapshotTest {
         player.view.background = gradient(2)
         player.showSizeAdjustForPreview()
         snapshot(player.view)
+    }
+
+    @Test
+    fun player_privacyAdjust() {
+        val player = PlayerScreen(context, navigator, scope, sampleVideos[2], playerFactory = null)
+        player.videoView.visibility = View.INVISIBLE
+        player.view.background = gradient(2)
+        player.showPrivacyAdjustForPreview(3)
+        snapshot(player.view)
+    }
+
+    /** What each "가림" level does to a picture (layoutlib cannot draw the TextureView itself). */
+    @Test
+    fun privacyFilter_levels() {
+        val grid = android.widget.GridLayout(context).apply { columnCount = 3 }
+        for (level in 0..com.chorockkim.rokidyoutube.player.PrivacyFilter.MAX_LEVEL) {
+            val cell = android.widget.LinearLayout(context).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setPadding(context.dp(4), context.dp(2), context.dp(4), context.dp(2))
+            }
+            cell.addView(ImageView(context).apply {
+                setImageDrawable(GradientDrawable(
+                    GradientDrawable.Orientation.LEFT_RIGHT,
+                    intArrayOf(Color.BLACK, Color.DKGRAY, Color.GRAY, 0xFF6F86B5.toInt(), Color.WHITE)
+                ))
+                colorFilter = com.chorockkim.rokidyoutube.player.PrivacyFilter.colorFilter(level)
+            }, android.widget.LinearLayout.LayoutParams(context.dp(148), context.dp(100)))
+            cell.addView(Hud.text(context, 12f).apply { text = if (level == 0) "끔" else "가림 $level" })
+            grid.addView(cell)
+        }
+        snapshot(grid)
     }
 
     @Test

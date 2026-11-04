@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.TextureView
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -16,6 +17,7 @@ import com.chorockkim.rokidyoutube.data.VideoItem
 import com.chorockkim.rokidyoutube.data.WatchHistory
 import com.chorockkim.rokidyoutube.data.YouTubeRepository
 import com.chorockkim.rokidyoutube.player.FineVolume
+import com.chorockkim.rokidyoutube.player.PrivacyFilter
 import com.chorockkim.rokidyoutube.player.StreamSelector
 import com.chorockkim.rokidyoutube.player.YoutubeMediaSources
 import com.chorockkim.rokidyoutube.ui.GlassesInput.Action
@@ -24,7 +26,7 @@ import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.PlaybackException
 import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.ui.AspectRatioFrameLayout
-import com.google.android.exoplayer2.ui.StyledPlayerView
+import com.google.android.exoplayer2.video.VideoSize
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -34,8 +36,9 @@ import org.schabi.newpipe.extractor.stream.StreamInfo
  * Player filling the HUD band. Controls (one row of buttons + progress) appear on tap and hide
  * after a few seconds. Hidden: swipe = seek ±10s, tap = show controls, back = close.
  * Shown: swipe walks the buttons, tap presses, back hides the controls.
- * [크기] / [볼륨] open an adjust panel: front/back swipes change the video size (10% steps,
- * 20-100%) or the volume (5% steps, see [FineVolume]); tap or back closes it. The volume keys
+ * [크기] / [가림] / [볼륨] open an adjust panel: front/back swipes change the video size (10%
+ * steps, 20-100%), the privacy filter (see [PrivacyFilter]) or the volume (5% steps, see
+ * [FineVolume]); tap or back closes it. The volume keys
  * also change the volume in 5% steps, and DPAD up/down (if the device sends them) the size.
  */
 class PlayerScreen(
@@ -53,21 +56,25 @@ class PlayerScreen(
         keepScreenOn = true
     }
 
-    internal val videoView = StyledPlayerView(context).apply {
-        useController = false
+    /**
+     * The video picture: a TextureView (not a SurfaceView) so the "가림" color filter can be
+     * applied to it, inside a frame that keeps the video's aspect ratio.
+     */
+    internal val videoView = AspectRatioFrameLayout(context).apply {
         resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-        setShutterBackgroundColor(Color.BLACK)
-        setKeepContentOnPlayerReset(true)
     }
+    private val textureView = TextureView(context)
     private val status = Hud.text(context, 15f, Hud.GREY).apply { gravity = Gravity.CENTER }
 
     private val prefs = context.getSharedPreferences("player", Context.MODE_PRIVATE)
     /** Video size in percent of the band, kept across videos and restarts. */
     private var sizePercent = prefs.getInt(KEY_SIZE, MAX_SIZE).coerceIn(MIN_SIZE, MAX_SIZE)
+    /** "가림" level 0 (off) .. [PrivacyFilter.MAX_LEVEL], kept across videos and restarts. */
+    private var privacyLevel = prefs.getInt(KEY_PRIVACY, 0).coerceIn(0, PrivacyFilter.MAX_LEVEL)
     private val volume: FineVolume? = if (playerFactory != null) FineVolume(context) else null
 
     /** What front/back swipes change while an adjust panel is open. */
-    private enum class Adjust { NONE, SIZE, VOLUME }
+    private enum class Adjust { NONE, SIZE, PRIVACY, VOLUME }
     private var adjust = Adjust.NONE
 
     // Centered adjust panel: "화면 크기" / "80%" / hint.
@@ -87,7 +94,7 @@ class PlayerScreen(
             setStroke(dp(1), Hud.DIM_GREEN)
             cornerRadius = dp(8).toFloat()
         }
-        addView(adjustTitle)
+        addView(adjustTitle, LinearLayout.LayoutParams(-2, -2))
         addView(adjustValue, LinearLayout.LayoutParams(-2, -2).apply { setMargins(0, dp(4), 0, dp(4)) })
         addView(adjustHint, LinearLayout.LayoutParams(-2, -2))
         visibility = View.GONE
@@ -112,16 +119,26 @@ class PlayerScreen(
         progressBackgroundTintList = android.content.res.ColorStateList.valueOf(Color.GRAY)
     }
 
-    private val playPause = Hud.button(context, "일시정지", 12f)
+    private val playPause = Hud.button(context, "멈춤", 12f)
     private val qualityButton = Hud.button(context, "480p", 12f)
     private val rail: List<Pair<TextView, () -> Unit>> = listOf(
         playPause to ::togglePlay,
         Hud.button(context, "-10초", 12f) to { seekBy(-10_000) },
         Hud.button(context, "+10초", 12f) to { seekBy(10_000) },
         Hud.button(context, "크기", 12f) to { startAdjust(Adjust.SIZE) },
+        Hud.button(context, "가림", 12f) to { startAdjust(Adjust.PRIVACY) },
         Hud.button(context, "볼륨", 12f) to { startAdjust(Adjust.VOLUME) },
         qualityButton to ::nextQuality,
-        Hud.button(context, "닫기", 12f) to { navigator.back() }
+        Hud.button(context, "닫기", 12f) to { navigator.back() },
+        // Red so it is not mistaken for 닫기 (which only closes the player).
+        Hud.button(context, "종료", 12f).apply {
+            setTextColor(
+                android.content.res.ColorStateList(
+                    arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
+                    intArrayOf(Hud.GREEN, Hud.RED)
+                )
+            )
+        } to { navigator.exitApp() }
     )
     private var railCursor = 0
 
@@ -145,7 +162,9 @@ class PlayerScreen(
     }
 
     init {
-        view.addView(videoView, FrameLayout.LayoutParams(-1, -1))
+        videoView.addView(textureView, FrameLayout.LayoutParams(-1, -1))
+        view.addView(videoView, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
+        applyPrivacy()
         view.addView(status, FrameLayout.LayoutParams(-1, -1))
         applySize()
 
@@ -163,7 +182,7 @@ class PlayerScreen(
             button.setBackgroundColor(Color.TRANSPARENT)
             button.background = Hud.outline(context, fill = Hud.SCRIM)
             buttons.addView(button, LinearLayout.LayoutParams(0, dp(34), 1f).apply {
-                if (i > 0) marginStart = dp(4)
+                if (i > 0) marginStart = dp(3)
             })
         }
         bottom.addView(buttons, LinearLayout.LayoutParams(-1, -2))
@@ -189,11 +208,17 @@ class PlayerScreen(
     override fun onShown() {
         if (player == null && playerFactory != null) {
             player = playerFactory.invoke().also { p ->
-                videoView.player = p
+                p.setVideoTextureView(textureView)
                 p.volume = volume?.gain ?: 1f
                 p.addListener(object : Player.Listener {
+                    override fun onVideoSizeChanged(size: VideoSize) {
+                        if (size.width > 0 && size.height > 0) {
+                            videoView.setAspectRatio(size.width * size.pixelWidthHeightRatio / size.height)
+                        }
+                    }
+
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
-                        playPause.text = if (isPlaying) "일시정지" else "재생"
+                        playPause.text = if (isPlaying) "멈춤" else "재생"
                         if (isPlaying) scheduleHide() else setControlsVisible(true)
                     }
 
@@ -225,7 +250,7 @@ class PlayerScreen(
         savePosition()
         loadJob?.cancel()
         handler.removeCallbacksAndMessages(null)
-        videoView.player = null
+        player?.clearVideoTextureView(textureView)
         player?.release()
         player = null
     }
@@ -296,6 +321,23 @@ class PlayerScreen(
         }
     }
 
+    private fun changePrivacy(delta: Int) {
+        val next = (privacyLevel + delta).coerceIn(0, PrivacyFilter.MAX_LEVEL)
+        if (next == privacyLevel) return
+        privacyLevel = next
+        prefs.edit().apply {
+            putInt(KEY_PRIVACY, next)
+            apply()
+        }
+        applyPrivacy()
+    }
+
+    /** Color filter on the video layer only; controls and text stay as they are. */
+    private fun applyPrivacy() {
+        val filter = PrivacyFilter.colorFilter(privacyLevel)
+        textureView.setLayerPaint(filter?.let { android.graphics.Paint().apply { colorFilter = it } })
+    }
+
     private fun changeVolume(steps: Int) {
         val v = volume ?: return
         v.change(steps)
@@ -315,8 +357,16 @@ class PlayerScreen(
     }
 
     private fun renderAdjust(mode: Adjust, hint: Boolean) {
-        adjustTitle.text = if (mode == Adjust.SIZE) "화면 크기" else "볼륨"
-        adjustValue.text = "${if (mode == Adjust.SIZE) sizePercent else volume?.percent ?: 100}%"
+        adjustTitle.text = when (mode) {
+            Adjust.SIZE -> "화면 크기"
+            Adjust.PRIVACY -> "가림 (앞사람에게 덜 보이게)"
+            else -> "볼륨"
+        }
+        adjustValue.text = when (mode) {
+            Adjust.SIZE -> "$sizePercent%"
+            Adjust.PRIVACY -> if (privacyLevel == 0) "끔" else "$privacyLevel / ${PrivacyFilter.MAX_LEVEL}"
+            else -> "${volume?.percent ?: 100}%"
+        }
         adjustHint.text = "앞뒤로 쓸어서 조절\n탭하면 완료"
         adjustHint.visibility = if (hint) View.VISIBLE else View.GONE
         adjustPanel.visibility = View.VISIBLE
@@ -327,6 +377,12 @@ class PlayerScreen(
 
     /** For snapshots: show the adjust panel as it looks after tapping [크기]. */
     internal fun showSizeAdjustForPreview() = startAdjust(Adjust.SIZE)
+
+    /** For snapshots: the "가림" panel at [level]. */
+    internal fun showPrivacyAdjustForPreview(level: Int) {
+        privacyLevel = level
+        startAdjust(Adjust.PRIVACY)
+    }
 
     /** Scales only the video picture around the band's center; controls keep their size. */
     private fun applySize() {
@@ -383,8 +439,11 @@ class PlayerScreen(
             when (action) {
                 Action.NEXT, Action.PREVIOUS, Action.UP, Action.DOWN -> {
                     val up = action == Action.NEXT || action == Action.UP
-                    if (adjust == Adjust.SIZE) resizeBy(if (up) SIZE_STEP else -SIZE_STEP)
-                    else changeVolume(if (up) 1 else -1)
+                    when (adjust) {
+                        Adjust.SIZE -> resizeBy(if (up) SIZE_STEP else -SIZE_STEP)
+                        Adjust.PRIVACY -> changePrivacy(if (up) 1 else -1)
+                        else -> changeVolume(if (up) 1 else -1)
+                    }
                     renderAdjust(adjust, hint = true)
                 }
                 Action.SELECT, Action.BACK -> endAdjust()
@@ -427,6 +486,7 @@ class PlayerScreen(
     private companion object {
         const val HIDE_AFTER_MS = 4_000L
         const val KEY_SIZE = "videoSizePercent"
+        const val KEY_PRIVACY = "privacyLevel"
         const val MIN_SIZE = 20
         const val MAX_SIZE = 100
         const val SIZE_STEP = 10

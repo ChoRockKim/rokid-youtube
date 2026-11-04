@@ -170,6 +170,11 @@ class MainActivity : ComponentActivity(), Navigator {
         ringTarget.requestFocus()
     }
 
+    override fun exitApp() {
+        // onDestroy releases the player and the screens.
+        finishAndRemoveTask()
+    }
+
     override fun openSearch() {
         push(SearchScreen(this, this, lifecycleScope) { YouTubeRepository.search(it) })
     }
