@@ -84,6 +84,7 @@ public final class RokidDialogNavigationHelper {
 
         final Window window = dialog.getWindow();
         if (window != null) {
+            RokidViewport.applyToDialog(window);
             window.setBackgroundDrawable(new ColorDrawable(Color.BLACK));
             final View decor = window.getDecorView();
             if (decor != null) {

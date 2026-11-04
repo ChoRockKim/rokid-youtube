@@ -12,7 +12,7 @@
         android:layout_height="match_parent"
         android:layout_gravity="center_vertical"
         android:layout_marginTop="4dp"
-        android:layout_marginRight="48dp"
+        android:layout_marginRight="40dp"
         android:layout_marginBottom="4dp"
         android:background="@drawable/rokid_search_field_background"
         android:focusable="true"
@@ -22,7 +22,7 @@
         android:paddingEnd="10dp"
         android:textColor="?attr/toolbarSearchColor"
         android:textColorHint="@color/white_secondary"
-        android:textSize="20sp"
+        android:textSize="16sp"
         android:imeOptions="actionSearch|flagNoFullscreen"
         android:inputType="textFilter|textNoSuggestions"
         android:maxLines="1"
@@ -32,8 +32,8 @@
 
     <FrameLayout
         android:id="@+id/toolbar_search_clear"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:layout_gravity="right|center_vertical"
         android:contentDescription="@string/clear"
         android:focusable="true"

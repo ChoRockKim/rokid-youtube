@@ -23,6 +23,7 @@ import androidx.core.content.ContextCompat;
 
 import org.schabi.newpipe.R;
 import org.schabi.newpipe.rokid.RokidMode;
+import org.schabi.newpipe.rokid.RokidViewport;
 
 import java.util.ArrayList;
 
@@ -319,8 +320,9 @@ final class RokidPlayerMenuController {
         final DisplayMetrics displayMetrics = context.getResources().getDisplayMetrics();
         final int width = Math.min(dp(420),
                 Math.max(dp(240), displayMetrics.widthPixels - dp(48)));
-        final int maxHeight = Math.max(dp(180),
-                Math.min(dp(440), displayMetrics.heightPixels - dp(96)));
+        // The app is confined to the HUD band, so the menu must fit inside it.
+        final int maxHeight = Math.max(dp(120),
+                Math.min(dp(440), RokidViewport.heightPx(context) - dp(24)));
         final int estimatedHeight = dp(16) + itemViews.size() * dp(48);
         final int height = estimatedHeight > maxHeight
                 ? maxHeight : ViewGroup.LayoutParams.WRAP_CONTENT;

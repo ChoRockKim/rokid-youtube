@@ -31,7 +31,8 @@ public final class RokidKeyboardController {
         String getString(int resId, Object... args);
     }
 
-    private static final int KEY_COLUMNS = 8;
+    // 11 columns keep the letter keyboard at 3 rows inside the 282dp band.
+    private static final int KEY_COLUMNS = 11;
     private static final String[] LETTER_KEYS = {
             "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
             "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
@@ -227,9 +228,7 @@ public final class RokidKeyboardController {
                 if (parent != null) {
                     parent.removeView(overlay);
                 }
-                decor.addView(overlay, new ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT));
+                decor.addView(overlay, RokidViewport.bandLayoutParams(activity));
             }
             return;
         }
@@ -244,12 +243,12 @@ public final class RokidKeyboardController {
         final LinearLayout panel = new LinearLayout(activity);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setGravity(Gravity.CENTER);
-        panel.setPadding(dp(activity, 16), dp(activity, 12), dp(activity, 16), dp(activity, 14));
+        panel.setPadding(dp(activity, 16), dp(activity, 8), dp(activity, 16), dp(activity, 8));
         panel.setBackground(outline(Color.WHITE, 2));
 
         preview = makeText(activity, 18, Typeface.NORMAL);
         preview.setSingleLine(true);
-        selectedKey = makeText(activity, 34, Typeface.BOLD);
+        selectedKey = makeText(activity, 26, Typeface.BOLD);
         selectedKey.setGravity(Gravity.CENTER);
         selectedKey.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         keyRows = new LinearLayout(activity);
@@ -268,11 +267,10 @@ public final class RokidKeyboardController {
         final FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM);
-        panelParams.setMargins(dp(activity, 10), 0, dp(activity, 10), dp(activity, 10));
+        panelParams.setMargins(dp(activity, 10), 0, dp(activity, 10), 0);
         overlay.addView(panel, panelParams);
 
-        decor.addView(overlay, new ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        decor.addView(overlay, RokidViewport.bandLayoutParams(activity));
     }
 
     @NonNull

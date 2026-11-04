@@ -3,4 +3,5 @@
     <item name="rokidKeyboardOverlay" type="id" />
     <item name="rokidPlayerMenuOverlay" type="id" />
     <item name="rokid_accessibility_select" type="id" />
+    <item name="rokid_viewport_applied" type="id" />
 </resources>

@@ -32,6 +32,7 @@ import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 import org.schabi.newpipe.ktx.hasAssignableCause
+import org.schabi.newpipe.rokid.RokidViewport
 import org.schabi.newpipe.settings.NewPipeSettings
 import org.schabi.newpipe.util.BridgeStateSaverInitializer
 import org.schabi.newpipe.util.Localization
@@ -84,6 +85,9 @@ open class App :
             Log.i(TAG, "This is a phoenix process! Aborting initialization of App[onCreate]")
             return
         }
+
+        // Confine every activity to the 480dp x 282dp HUD band at the bottom of the glasses.
+        RokidViewport.install(this)
 
         // check if the last used preference version is set
         // to determine whether this is the first app run

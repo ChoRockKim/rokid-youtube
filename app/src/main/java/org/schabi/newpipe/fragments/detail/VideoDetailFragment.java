@@ -110,6 +110,7 @@ import org.schabi.newpipe.rokid.RokidDialogNavigationHelper;
 import org.schabi.newpipe.rokid.RokidKeyMapper;
 import org.schabi.newpipe.rokid.RokidKeyboardController;
 import org.schabi.newpipe.rokid.RokidMode;
+import org.schabi.newpipe.rokid.RokidViewport;
 import org.schabi.newpipe.util.AccessibilityUtils;
 import org.schabi.newpipe.util.Constants;
 import org.schabi.newpipe.util.DeviceUtils;
@@ -1495,10 +1496,7 @@ public final class VideoDetailFragment
                     final DisplayMetrics metrics = getResources().getDisplayMetrics();
 
                     if (getView() != null) {
-                        final int height = (DeviceUtils.isInMultiWindow(activity)
-                                ? requireView()
-                                : activity.getWindow().getDecorView()).getHeight();
-                        setHeightThumbnail(height, metrics);
+                        setHeightThumbnail(getFullscreenPlayerHeight(), metrics);
                         getView().getViewTreeObserver().removeOnPreDrawListener(preDrawListener);
                     }
                     return false;
@@ -1518,9 +1516,7 @@ public final class VideoDetailFragment
         requireView().getViewTreeObserver().removeOnPreDrawListener(preDrawListener);
 
         if (isFullscreen()) {
-            final int height = (DeviceUtils.isInMultiWindow(activity)
-                    ? requireView()
-                    : activity.getWindow().getDecorView()).getHeight();
+            final int height = getFullscreenPlayerHeight();
             // Height is zero when the view is not yet displayed like after orientation change
             if (height != 0) {
                 setHeightThumbnail(height, metrics);
@@ -1528,11 +1524,27 @@ public final class VideoDetailFragment
                 requireView().getViewTreeObserver().addOnPreDrawListener(preDrawListener);
             }
         } else {
-            final int height = (int) (isPortrait
+            int height = (int) (isPortrait
                     ? metrics.widthPixels / (16.0f / 9.0f)
                     : metrics.heightPixels / 2.0f);
+            if (RokidMode.enabled()) {
+                height = Math.min(height, RokidViewport.heightPx(activity));
+            }
             setHeightThumbnail(height, metrics);
         }
+    }
+
+    /**
+     * @return the height available to the fullscreen player. On the glasses the app only owns
+     * the HUD band at the bottom of the display, not the whole decor view.
+     */
+    private int getFullscreenPlayerHeight() {
+        if (RokidMode.enabled()) {
+            return RokidViewport.heightPx(activity);
+        }
+        return (DeviceUtils.isInMultiWindow(activity)
+                ? requireView()
+                : activity.getWindow().getDecorView()).getHeight();
     }
 
     private void setHeightThumbnail(final int newHeight, final DisplayMetrics metrics) {
@@ -1541,7 +1553,9 @@ public final class VideoDetailFragment
                         RelativeLayout.LayoutParams.MATCH_PARENT, newHeight));
         binding.detailThumbnailImageView.setMinimumHeight(newHeight);
         if (isPlayerAvailable()) {
-            final int maxHeight = (int) (metrics.heightPixels * MAX_PLAYER_HEIGHT);
+            final int maxHeight = RokidMode.enabled()
+                    ? RokidViewport.heightPx(activity)
+                    : (int) (metrics.heightPixels * MAX_PLAYER_HEIGHT);
             player.UIs().get(VideoPlayerUi.class).ifPresent(ui ->
                     ui.getBinding().surfaceView.setHeights(newHeight,
                             ui.isFullscreen() ? newHeight : maxHeight));

@@ -72,6 +72,8 @@
 
     <!-- Black Theme -->
     <style name="Base.V21.BlackTheme" parent="DarkTheme">
+        <!-- RokidPipe runs inside a 282dp tall HUD band; keep the toolbar short. -->
+        <item name="actionBarSize">@dimen/rokid_toolbar_height</item>
         <item name="colorPrimary">@color/black_background_color</item>
         <item name="colorPrimaryDark">@color/black_background_color</item>
         <item name="colorAccent">@color/white</item>

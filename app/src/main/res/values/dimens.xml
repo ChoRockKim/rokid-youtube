@@ -19,13 +19,17 @@
     <dimen name="drawer_header_service_icon_size">16dp</dimen>
     <dimen name="drawer_header_service_title_text_size">14sp</dimen>
 
+    <!-- Rokid HUD band (480dp x 282dp): compact top bars so lists keep ~2 rows visible -->
+    <dimen name="rokid_toolbar_height">40dp</dimen>
+    <dimen name="rokid_section_nav_height">44dp</dimen>
+
     <!-- Video Item Search View Dimensions-->
     <!-- Text Size -->
     <dimen name="channel_item_detail_title_text_size">16sp</dimen>
-    <dimen name="video_item_search_title_text_size">20sp</dimen>
-    <dimen name="video_item_search_duration_text_size">16sp</dimen>
-    <dimen name="video_item_search_uploader_text_size">16sp</dimen>
-    <dimen name="video_item_search_upload_date_text_size">16sp</dimen>
+    <dimen name="video_item_search_title_text_size">16sp</dimen>
+    <dimen name="video_item_search_duration_text_size">12sp</dimen>
+    <dimen name="video_item_search_uploader_text_size">13sp</dimen>
+    <dimen name="video_item_search_upload_date_text_size">13sp</dimen>
     <!-- Elements Size -->
     <!-- 16 / 9 ratio-->
     <dimen name="video_item_search_thumbnail_image_width">124dp</dimen>
@@ -41,7 +45,7 @@
     <dimen name="channel_item_grid_thumbnail_image_size">92dp</dimen>
     <dimen name="channel_item_grid_min_width">128dp</dimen>
     <!-- Calculated: 2*video_item_search_padding + video_item_search_thumbnail_image_height -->
-    <dimen name="video_item_search_height">112dp</dimen>
+    <dimen name="video_item_search_height">86dp</dimen>
     <!-- Paddings & Margins -->
     <dimen name="video_item_search_padding">8dp</dimen>
     <dimen name="video_item_search_image_right_margin">12dp</dimen>

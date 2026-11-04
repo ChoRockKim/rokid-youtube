@@ -23,8 +23,8 @@ import org.schabi.newpipe.util.ServiceHelper;
 import java.util.List;
 
 public final class RokidKioskNavBar {
-    private static final int BUTTON_HEIGHT_DP = 40;
-    private static final int BUTTON_MIN_WIDTH_DP = 84;
+    private static final int BUTTON_HEIGHT_DP = 34;
+    private static final int BUTTON_MIN_WIDTH_DP = 72;
     private static final int BUTTON_MAX_WIDTH_DP = 160;
     private static final int BUTTON_HORIZONTAL_MARGIN_DP = 4;
     private static final int BUTTON_HORIZONTAL_PADDING_DP = 12;

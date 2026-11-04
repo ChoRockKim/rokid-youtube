@@ -9,7 +9,7 @@
     <LinearLayout
         android:id="@+id/rokid_section_nav"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="@dimen/rokid_section_nav_height"
         android:layout_alignParentTop="true"
         android:background="@android:color/black"
         android:orientation="horizontal"

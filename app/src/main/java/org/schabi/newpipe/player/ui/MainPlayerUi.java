@@ -69,6 +69,7 @@ import org.schabi.newpipe.player.playqueue.PlayQueueItemBuilder;
 import org.schabi.newpipe.player.playqueue.PlayQueueItemHolder;
 import org.schabi.newpipe.player.playqueue.PlayQueueItemTouchCallback;
 import org.schabi.newpipe.rokid.RokidMode;
+import org.schabi.newpipe.rokid.RokidViewport;
 import org.schabi.newpipe.util.DeviceUtils;
 import org.schabi.newpipe.util.NavigationHelper;
 import org.schabi.newpipe.util.external_communication.KoreUtils;
@@ -508,7 +509,9 @@ public final class MainPlayerUi extends VideoPlayerUi implements View.OnLayoutCh
      */
     @Override
     protected float calculateMaxEndScreenThumbnailHeight(@NonNull final Bitmap bitmap) {
-        final int screenHeight = context.getResources().getDisplayMetrics().heightPixels;
+        final int screenHeight = RokidMode.enabled()
+                ? RokidViewport.heightPx(context)
+                : context.getResources().getDisplayMetrics().heightPixels;
 
         if (DeviceUtils.isTv(context) && !isFullscreen()) {
             final int videoInfoHeight = DeviceUtils.dpToPx(DETAIL_ROOT_MINIMUM_HEIGHT, context)
