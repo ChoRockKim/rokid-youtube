@@ -54,6 +54,7 @@ Herald처럼 **구글 공식 로그인**(OAuth 기기 코드 방식)과 **YouTub
    googleClientId=1234567890-xxxx.apps.googleusercontent.com
    googleClientSecret=GOCSPX-xxxx
    ```
+   환경 변수 `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`로 넣어도 됩니다(클라우드 빌드 환경용).
 6. 다시 빌드해서 설치합니다. 안경 홈 오른쪽 끝 **[로그인]**을 누르고, 폰에서 google.com/device를 열어 안경에 뜬 코드를 입력합니다.
 
 **하루 사용량 한도:** YouTube Data API는 프로젝트당 하루 10,000 단위입니다. 구독 목록이나 좋아요를 한 번 불러오는 데 1~4 단위라 개인용으로는 충분합니다. 구독 채널의 새 영상 자체는 채널 공개 피드(RSS)에서 받아서 한도를 쓰지 않습니다. 한도를 넘으면 태평양 시간 자정에 초기화됩니다.

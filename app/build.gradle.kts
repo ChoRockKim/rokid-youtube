@@ -7,12 +7,14 @@ plugins {
 }
 
 // Your own Google OAuth client ("TVs and Limited Input devices"), see README. Kept out of git:
-// put googleClientId / googleClientSecret in local.properties or pass them as -P properties.
+// googleClientId / googleClientSecret from local.properties, -P properties, or the environment
+// variables GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET (e.g. set in a cloud build environment).
 val localProps = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
-fun secret(name: String): String =
-    (localProps.getProperty(name) ?: providers.gradleProperty(name).orNull ?: "").replace("\"", "")
+fun secret(name: String, env: String): String =
+    (localProps.getProperty(name) ?: providers.gradleProperty(name).orNull
+        ?: providers.environmentVariable(env).orNull ?: "").trim().replace("\"", "")
 
 kotlin {
     jvmToolchain(21)
@@ -30,8 +32,8 @@ configure<ApplicationExtension> {
         versionCode = 1
         versionName = "0.1.0"
 
-        buildConfigField("String", "GOOGLE_CLIENT_ID", "\"${secret("googleClientId")}\"")
-        buildConfigField("String", "GOOGLE_CLIENT_SECRET", "\"${secret("googleClientSecret")}\"")
+        buildConfigField("String", "GOOGLE_CLIENT_ID", "\"${secret("googleClientId", "GOOGLE_CLIENT_ID")}\"")
+        buildConfigField("String", "GOOGLE_CLIENT_SECRET", "\"${secret("googleClientSecret", "GOOGLE_CLIENT_SECRET")}\"")
     }
 
     buildTypes {
