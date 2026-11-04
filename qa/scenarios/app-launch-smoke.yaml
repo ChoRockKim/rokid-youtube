@@ -1,0 +1,41 @@
+id: app-launch-smoke
+name: "Build, install, launch, and capture RokidPipe baseline"
+risk: high
+app: RokidPipe
+requires:
+  phone: false
+  glasses: true
+  network: false
+build:
+  commands:
+    - .\gradlew.bat :app:testDebugUnitTest
+    - .\gradlew.bat :app:assembleDebug
+steps:
+  -
+    type: install
+    target: glasses
+    apk: app/build/outputs/apk/debug/app-debug.apk
+  -
+    type: launch
+    target: glasses
+    package: com.anezium.rokid.newpipe
+  -
+    type: sleep
+    ms: 2500
+  -
+    type: logcat
+    target: glasses
+  -
+    type: screenshot
+    target: glasses
+expect:
+  log_contains:
+    - START
+  state:
+    launched: true
+    package: com.anezium.rokid.newpipe
+artifacts:
+  - glasses_logcat
+  - screenshot
+notes:
+  - "Current runner verifies current focus/window through adb; replace with DUMP_ROKID_STATE when available."

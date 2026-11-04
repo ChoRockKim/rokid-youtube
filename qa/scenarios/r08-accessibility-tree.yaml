@@ -1,0 +1,58 @@
+id: r08-accessibility-tree
+name: "R08 Access Bridge can traverse NewPipe commands through Accessibility"
+risk: high
+app: RokidPipe
+requires:
+  phone: false
+  glasses: true
+  accessibility: true
+build:
+  commands:
+    - .\gradlew.bat :app:testDebugUnitTest
+    - .\gradlew.bat :app:assembleDebug
+steps:
+  -
+    type: launch
+    target: glasses
+    package: com.anezium.rokid.newpipe
+  -
+    type: uiautomator-dump
+    target: glasses
+  -
+    type: assert-nodes
+    target: glasses
+expect:
+  state:
+    hasClickableSearch: true
+    hasFocusableKeyboardKeys: true
+    keyboardKeysHaveContentDescriptions: true
+    keyboardHasCustomSelectAction: true
+    keyboardFocusIsOutlineOnly: true
+    hasLabeledVideoRows: true
+    hasLabeledRokidPlayerActions: true
+    hasRokidCustomSelectAction: true
+    hasFocusableRokidPlayerMenus: true
+    hasLabeledDownloadRows: true
+    downloadActivityHasRokidKeyNavigation: true
+    hasLabeledPlayQueueRows: true
+    playQueueActivityHasRokidKeyNavigation: true
+    playQueueActivityControlsHaveContentDescriptions: true
+    hasLabeledChapterRows: true
+    playerItemsListContainerNotFocusableInRokidMode: true
+    hasLabeledSettingsSelectorRows: true
+    settingsActivityHasRokidKeyNavigation: true
+    settingsSearchUsesRokidKeyboard: true
+    hasLabeledNotificationActionRows: true
+    noTodoContentDescriptions: true
+    noUnnamedFocusableActions: true
+artifacts:
+  - uiautomator.xml
+  - rokid-debug-state.json
+  - glasses_logcat
+notes:
+  - "R08 navigator accepts visible enabled clickable nodes or focusable nodes with ACTION_FOCUS; labels must come from text or contentDescription."
+  - "Keyboard and player menu nodes must be real clickable/focusable views, not only rendered text."
+  - "Keyboard keys expose the same custom Select accessibility action as player controls, so focus movement does not insert text."
+  - "Keyboard selected state should remain outline-only on a black background for AR see-through."
+  - "Player rail buttons and player menu rows expose a custom Select accessibility action so R08 Access Bridge can move the app selection without firing click activation."
+  - "Decorative thumbnails, icons, and drag handles should not become separate focus stops when the row itself carries the action."

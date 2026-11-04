@@ -1,0 +1,18 @@
+project: RokidPipe
+phoneModules:
+
+glassesModules:
+  - app
+packages:
+  phone:
+
+  glasses:
+    - com.anezium.rokid.newpipe
+buildCommands:
+  - .\gradlew.bat :app:testDebugUnitTest
+  - .\gradlew.bat :app:assembleDebug
+scenarioDir: qa/scenarios
+artifactDir: qa/artifacts
+notes:
+  - NewPipe glasses profile for swipe-only navigation, offline Wi-Fi recovery, player controls, and R08 Accessibility.
+  - Use explicit phone/glasses serials when more than one ADB device is connected.
