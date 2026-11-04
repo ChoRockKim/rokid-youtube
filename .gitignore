@@ -1,39 +1,9 @@
 .gradle/
+.kotlin/
 local.properties
 .DS_Store
 **/build/
-!src/**/build/
 captures/
 .idea/
 *.iml
 *~
-.weblate
-.kotlin
-*.class
-app/debug/
-app/release/
-
-# Rokid local scratch (planning + adb diagnostics, kept on disk, out of git)
-/plan.md
-/rokid-newpipe-*.png
-/rokid-window*.xml
-
-# vscode / eclipse files
-*.classpath
-*.project
-*.settings
-bin/
-.vscode/
-*.code-workspace
-
-# xcode files
-xcuserdata
-.externalNativeBuild
-.cxx
-node_modules/
-*.xcodeproj/*
-!*.xcodeproj/project.pbxproj
-!*.xcodeproj/xcshareddata/
-!*.xcodeproj/project.xcworkspace/
-!*.xcworkspace/contents.xcworkspacedata
-**/xcshareddata/WorkspaceSettings.xcsettings

@@ -1,328 +1,79 @@
-/*
- * SPDX-FileCopyrightText: 2025 NewPipe e.V. <https://newpipe-ev.de>
- * SPDX-License-Identifier: GPL-3.0-or-later
- */
-
 import com.android.build.api.dsl.ApplicationExtension
-import com.mikepenz.aboutlibraries.plugin.DuplicateMode
-import java.util.regex.Pattern
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.android.legacy.kapt)
-    alias(libs.plugins.google.ksp)
-    alias(libs.plugins.jetbrains.kotlin.parcelize)
-    alias(libs.plugins.jetbrains.kotlinx.serialization)
-    alias(libs.plugins.sonarqube)
-    alias(libs.plugins.about.libraries)
-    checkstyle
+    alias(libs.plugins.paparazzi)
 }
-
-val rokidGlassMode = providers.gradleProperty("rokidGlassMode").orElse("true")
 
 kotlin {
     jvmToolchain(21)
-    compilerOptions {
-        // TODO: Drop annotation default target when it is stable
-        freeCompilerArgs.addAll(
-            "-Xannotation-default-target=param-property"
-        )
-    }
 }
 
 configure<ApplicationExtension> {
-    compileSdk {
-        version = release(NEWPIPE_VERSION_SDK_COMPILE_MAJOR) {
-            minorApiLevel = NEWPIPE_VERSION_SDK_COMPILE_MINOR
-        }
-    }
-    namespace = NEWPIPE_APPLICATION_ID_OLD
+    namespace = "com.chorockkim.rokidyoutube"
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.anezium.rokid.newpipe"
-        resValue("string", "app_name", "RokidPipe")
-        buildConfigField("boolean", "ROKID_GLASS_MODE", rokidGlassMode.get())
-        minSdk {
-            version = release(NEWPIPE_VERSION_SDK_MIN)
-        }
-        targetSdk {
-            version = release(NEWPIPE_VERSION_SDK_TARGET)
-        }
-
-        versionCode = System.getProperty("versionCodeOverride")?.toInt() ?: NEWPIPE_VERSION_CODE
-
-        versionName = NEWPIPE_VERSION_NAME
-        System.getProperty("versionNameSuffix")?.let { versionNameSuffix = it }
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        applicationId = "com.chorockkim.rokidyoutube"
+        // Rokid Glasses run Android 12 (API 31/32).
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 1
+        versionName = "0.1.0"
     }
 
     buildTypes {
-        debug {
-            isDebuggable = true
-        }
-
         release {
-            System.getProperty("packageSuffix")?.let { suffix ->
-                applicationIdSuffix = suffix
-                resValue("string", "app_name", "RokidPipe $suffix")
-            }
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
-
-        register("continuous") {
-            initWith(getByName("release"))
+            isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("debug")
-            isDefault = true
-            resValue("string", "app_name", "RokidPipe Continuous")
         }
-    }
-
-    lint {
-        lintConfig = file("lint.xml")
-        // Continue the debug build even when errors are found
-        abortOnError = false
     }
 
     compileOptions {
-        // Flag to enable support for the new language APIs
         isCoreLibraryDesugaringEnabled = true
-        encoding = "utf-8"
-    }
-
-    sourceSets {
-        getByName("androidTest") {
-            assets.directories += "$projectDir/schemas"
-        }
-    }
-
-    androidResources {
-        generateLocaleConfig = true
     }
 
     buildFeatures {
         viewBinding = true
         buildConfig = true
-        resValues = true
     }
 
-    packaging {
-        resources {
-            // remove two files which belong to jsoup
-            // no idea how they ended up in the META-INF dir...
-            excludes += setOf(
-                "META-INF/README.md",
-                "META-INF/CHANGES",
-                "META-INF/COPYRIGHT" // "COPYRIGHT" belongs to RxJava...
-            )
-        }
-    }
-}
-
-ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
-}
-
-
-// Custom dependency configuration for ktlint
-val ktlint by configurations.creating
-
-checkstyle {
-    configDirectory = rootProject.file("checkstyle")
-    isIgnoreFailures = false
-    isShowViolations = true
-    toolVersion = libs.versions.checkstyle.get()
-}
-
-tasks.register<Checkstyle>("runCheckstyle") {
-    source("src")
-    include("**/*.java")
-    exclude("**/gen/**")
-    exclude("**/R.java")
-    exclude("**/BuildConfig.java")
-    exclude("main/java/us/shandian/giga/**")
-
-    classpath = configurations.getByName("checkstyle")
-
-    isShowViolations = true
-
-    reports {
-        xml.required = true
-        html.required = true
-    }
-}
-
-val outputDir = project.layout.buildDirectory.dir("reports/ktlint/")
-val inputFiles = fileTree("src") { include("**/*.kt") }
-
-tasks.register<JavaExec>("runKtlint") {
-    inputs.files(inputFiles)
-    outputs.dir(outputDir)
-    mainClass.set("com.pinterest.ktlint.Main")
-    classpath = configurations.getByName("ktlint")
-    args = listOf("--editorconfig=../.editorconfig", "src/**/*.kt")
-    jvmArgs = listOf("--add-opens", "java.base/java.lang=ALL-UNNAMED")
-}
-
-tasks.register<JavaExec>("formatKtlint") {
-    inputs.files(inputFiles)
-    outputs.dir(outputDir)
-    mainClass.set("com.pinterest.ktlint.Main")
-    classpath = configurations.getByName("ktlint")
-    args = listOf("--editorconfig=../.editorconfig", "-F", "src/**/*.kt")
-    jvmArgs = listOf("--add-opens", "java.base/java.lang=ALL-UNNAMED")
-}
-
-tasks.register<CheckDependenciesOrder>("checkDependenciesOrder") {
-    tomlFile = layout.projectDirectory.file("../gradle/libs.versions.toml")
-}
-
-afterEvaluate {
-    tasks.named("preDebugBuild").configure {
-        if (!System.getProperties().containsKey("skipFormatKtlint")) {
-            dependsOn("formatKtlint")
-        }
-        dependsOn("runCheckstyle", "runKtlint", "checkDependenciesOrder")
-    }
-}
-
-sonar {
-    properties {
-        property("sonar.projectKey", "TeamNewPipe_NewPipe")
-        property("sonar.organization", "teamnewpipe")
-        property("sonar.host.url", "https://sonarcloud.io")
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
     }
 }
 
 dependencies {
-    // Desugaring
-    coreLibraryDesugaring(libs.android.desugar)
+    coreLibraryDesugaring(libs.desugar)
 
-    // NewPipe libraries
-    implementation(projects.shared)
-    implementation(libs.newpipe.nanojson)
-    implementation(libs.newpipe.extractor)
-    implementation(libs.newpipe.filepicker)
-
-    // Checkstyle
-    checkstyle(libs.puppycrawl.checkstyle)
-    ktlint(libs.pinterest.ktlint)
-
-    // AndroidX
-    implementation(libs.androidx.appcompat)
-    implementation(libs.androidx.cardview)
-    implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.activity)
     implementation(libs.androidx.core)
-    implementation(libs.androidx.documentfile)
-    implementation(libs.androidx.fragment)
-    implementation(libs.androidx.lifecycle.livedata)
-    implementation(libs.androidx.lifecycle.viewmodel)
-    implementation(libs.androidx.localbroadcastmanager)
-    implementation(libs.androidx.media)
-    implementation(libs.androidx.preference)
+    implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.recyclerview)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.rxjava3)
-    ksp(libs.androidx.room.compiler)
-    implementation(libs.androidx.swiperefreshlayout)
-    implementation(libs.androidx.viewpager2)
-    implementation(libs.androidx.work.runtime)
-    implementation(libs.androidx.work.rxjava3)
-    implementation(libs.google.android.material)
     implementation(libs.androidx.webkit)
+    implementation(libs.kotlinx.coroutines.android)
 
-    // Coroutines interop
-    implementation(libs.kotlinx.coroutines.rx3)
+    // YouTube extraction, the same library RokidPipe / NewPipe use.
+    implementation(libs.newpipe.extractor)
+    implementation(libs.nanojson) // used directly by the PoToken code
+    implementation(libs.okhttp)
+    implementation(libs.rxjava)
+    implementation(libs.rxandroid)
 
-    // Kotlinx Serialization
-    implementation(libs.kotlinx.serialization.json)
+    // Playback, same ExoPlayer version as RokidPipe so its YouTube data source ports as-is.
+    implementation(libs.exoplayer.core)
+    implementation(libs.exoplayer.dash)
+    implementation(libs.exoplayer.hls)
+    implementation(libs.exoplayer.ui)
 
-    // Third-party libraries
-    implementation(libs.livefront.bridge)
-    implementation(libs.evernote.statesaver.core)
-    kapt(libs.evernote.statesaver.compiler)
-
-    // HTML parser
-    implementation(libs.jsoup)
-
-    // HTTP client
-    implementation(libs.squareup.okhttp)
-
-    // Media player
-    implementation(libs.google.exoplayer.core)
-    implementation(libs.google.exoplayer.dash)
-    implementation(libs.google.exoplayer.database)
-    implementation(libs.google.exoplayer.datasource)
-    implementation(libs.google.exoplayer.hls)
-    implementation(libs.google.exoplayer.mediasession)
-    implementation(libs.google.exoplayer.smoothstreaming)
-    implementation(libs.google.exoplayer.ui)
-
-    // Manager for complex RecyclerView layouts
-    implementation(libs.lisawray.groupie.core)
-    implementation(libs.lisawray.groupie.viewbinding)
-
-    // Image loading
-    implementation(libs.coil.compose)
+    implementation(libs.coil)
     implementation(libs.coil.network.okhttp)
 
-    // Markdown library for Android
-    implementation(libs.noties.markwon.core)
-    implementation(libs.noties.markwon.linkify)
-
-    // Crash reporting
-    implementation(libs.acra.core)
-    compileOnly(libs.google.autoservice.annotations)
-    ksp(libs.zacsweers.autoservice.compiler)
-
-    // Properly restarting
-    implementation(libs.jakewharton.phoenix)
-
-    // Reactive extensions for Java VM
-    implementation(libs.reactivex.rxjava)
-    implementation(libs.reactivex.rxandroid)
-    // RxJava binding APIs for Android UI widgets
-    implementation(libs.jakewharton.rxbinding)
-
-    // Date and time formatting
-    implementation(libs.ocpsoft.prettytime)
-
-    // Debugging and memory leak detection
-    debugImplementation(libs.squareup.leakcanary.watcher)
-    debugImplementation(libs.squareup.leakcanary.plumber)
-    debugImplementation(libs.squareup.leakcanary.core)
-    // Debug bridge for Android
-    debugImplementation(libs.facebook.stetho.core)
-    debugImplementation(libs.facebook.stetho.okhttp3)
-
-    // Testing
     testImplementation(libs.junit)
-    testImplementation(libs.mockito.core)
-
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.runner)
-    androidTestImplementation(libs.androidx.room.testing)
-    androidTestImplementation(libs.assertj.core)
 }
 
-aboutLibraries {
-    collect {
-        configPath = file("../config/aboutlibraries")
-    }
-    export {
-        outputFile = file("../shared/src/androidMain/assets/aboutlibraries.json")
-        prettyPrint = true
-        excludeFields.addAll("organization", "scm", "funding")
-    }
-    library {
-        exclusionPatterns = listOf(
-            Pattern.compile("^com\\.github\\.TeamNewPipe:NewPipeExtractor$"),
-            Pattern.compile("^com\\.evernote:android-state$")
-        )
-    }
+tasks.withType<Test>().configureEach {
+    // YouTubeNetworkTest only runs with -PnetworkTests=true.
+    systemProperty("networkTests", providers.gradleProperty("networkTests").getOrElse("false"))
+    testLogging { showStandardStreams = true }
 }

@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <item name="rokidKeyboardOverlay" type="id" />
-    <item name="rokidPlayerMenuOverlay" type="id" />
-    <item name="rokid_accessibility_select" type="id" />
-</resources>

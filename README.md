@@ -1,126 +1,65 @@
-# RokidPipe
+# Rokid YouTube
 
-<p align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="RokidPipe app icon" width="150">
-</p>
+Rokid 안경용 유튜브 앱입니다. 화면 전체가 아래쪽 **480dp × 282dp 띠** 안에 그려지고, 띠는 바텀 마진 없이 화면 맨 아래에 붙어 있습니다. 띠 위쪽은 검은색이라 안경에서는 투명하게 보입니다.
 
-A fork of NewPipe adapted for Rokid glasses. RokidPipe is an independent
-project and is not affiliated with or endorsed by NewPipe e.V. or TeamNewPipe.
+유튜브 영상을 불러오고 재생하는 방식은 [RokidPipe](https://github.com/Anezium/RokidPipe)(NewPipe 포크)에서 그대로 가져왔고, 화면은 이 띠 크기에 맞춰 Kotlin으로 새로 만들었습니다. RokidPipe를 고친 버전은 `rokid-hud-band` 브랜치에 있습니다.
 
-This fork is focused on a 480 x 640, no-touch glasses workflow: swipe, tap,
-back. The goal is to keep the useful parts of NewPipe while making the core
-screens usable directly from the glasses, without hunting through phone-style
-menus or relying on vertical gestures.
+## 화면
 
-<p align="center">
-  <a href="https://ko-fi.com/anezium" target="_blank">
-    <img height="36" style="border:0px;height:36px;" src="https://storage.ko-fi.com/cdn/kofi4.png?v=6" border="0" alt="Buy Me a Coffee at ko-fi.com" />
-  </a>
-</p>
+| 홈 | 검색 키보드 | 플레이어 |
+|---|---|---|
+| ![home](app/src/test/snapshots/images/com.chorockkim.rokidyoutube.ui_HudSnapshotTest_home_rowSelected.png) | ![keyboard](app/src/test/snapshots/images/com.chorockkim.rokidyoutube.ui_HudSnapshotTest_search_keyboard.png) | ![player](app/src/test/snapshots/images/com.chorockkim.rokidyoutube.ui_HudSnapshotTest_player_controls.png) |
 
-## Screenshots From The Glasses
+위 그림은 [Paparazzi](https://github.com/cashapp/paparazzi)가 실제 레이아웃 코드로 그린 480×640 화면입니다. 썸네일과 영상 화면은 그림 대신 색만 넣었습니다.
 
-These screenshots were captured from the app running on Rokid glasses
-(`480x640`, refreshed on 2026-06-28).
+- **홈**: [검색] + 유튜브 카테고리(게임·음악·영화·팟캐스트·라이브) 탭, 그 아래 영상 목록
+- **검색**: 안경용 키보드(영어·숫자). 한국어는 **음성** 키로 입력
+- **플레이어**: 한 줄 버튼 [일시정지][-10초][+10초][화질][닫기] + 진행 바
 
-| Home | Search keyboard |
-| --- | --- |
-| ![Home on Rokid glasses](docs/screenshots/rokid-home.png) | ![Search keyboard on Rokid glasses](docs/screenshots/rokid-search-keyboard.png) |
+## 조작
 
-| Video detail | Player actions |
-| --- | --- |
-| ![Video detail on Rokid glasses](docs/screenshots/rokid-video-detail.png) | ![Player actions on Rokid glasses](docs/screenshots/rokid-player-actions.png) |
+| 동작 | 목록·키보드 | 플레이어 (버튼 숨김) | 플레이어 (버튼 보임) |
+|---|---|---|---|
+| 앞/뒤로 쓸기 | 다음/이전 항목 | 10초 앞/뒤로 | 다음/이전 버튼 |
+| 탭 | 선택 | 버튼 보이기 | 버튼 누르기 |
+| 뒤로 | 이전 화면 | 플레이어 닫기 | 버튼 숨기기 |
 
-## What Changed
+키 매핑은 RokidPipe와 같습니다(쓸기 = DPAD 좌우·183/184, 탭 = ENTER·202, 한 번 쓸기에 두 번 들어오는 이벤트는 240ms 디바운스).
 
-- Rokid-first home screen with `Search` followed by available NewPipe kiosk categories
-  kept in the top bar.
-- Search opens with the Rokid-friendly on-screen keyboard.
-- One-axis navigation: swipe moves focus, tap activates, back exits.
-- Directional debounce prevents one physical swipe from jumping twice.
-- Video detail is simplified for quick play on a small HUD.
-- Player controls are reachable from a bottom action rail: play/pause, exit,
-  quality, speed, subtitles, and close.
-- Error states keep useful actions reachable and remove browser/phone actions
-  that do not make sense on the glasses.
-- UI uses black surfaces, high-contrast text, outline focus, and 480 x 640-safe
-  spacing.
+## RokidPipe에서 가져온 것
 
-## Glasses Controls
+| 이 프로젝트 | RokidPipe 원본 |
+|---|---|
+| `net/OkHttpDownloader.kt` | `DownloaderImpl.java` |
+| `potoken/*` (유튜브 봇 확인 토큰, WebView) | `util/potoken/*` |
+| `player/YoutubeHttpDataSource.java` | `player/datasource/YoutubeHttpDataSource.java` |
+| `player/YoutubeMediaSources.kt` | `player/resolver/PlaybackResolver.java`, `player/helper/PlayerDataSource.java` |
+| `player/StreamSelector.kt` | `util/ListHelper.java`, `player/resolver/VideoPlaybackResolver.java` |
+| `ui/GlassesInput.kt` | `rokid/RokidKeyMapper.java` |
 
-- Swipe forward/back to move through focusable items.
-- Tap/select to activate the focused item.
-- Back closes action mode, hides the keyboard, or returns to the previous screen.
-- Text entry uses the Rokid keyboard: swipe through letters/actions, tap to
-  insert, and use `go` to search.
+라이브러리: NewPipeExtractor v0.26.3, ExoPlayer 2.19.1 (RokidPipe와 같은 버전).
 
-`DPAD_UP` and `DPAD_DOWN` are not required for the app UX. They are only kept as
-defensive Android compatibility aliases in code, because the target glasses flow
-must work with the real swipe axis plus tap/back.
+## 빌드와 설치
 
-## R08 Access Bridge
-
-R08 Access Bridge `v1.4.7` adds RokidPipe compatibility. When RokidPipe is the
-active app, the bridge forwards R08 ring navigation into the app's own one-axis
-navigator instead of trying to drive the phone UI model.
-
-- R08 swipe forward/back moves through RokidPipe focus.
-- R08 single tap activates the focused item.
-- R08 double tap performs Android Back.
-- Use R08 Access Bridge Stable mode for the most predictable input.
-
-Install the latest bridge from
-[R08 Access Bridge releases](https://github.com/Anezium/R08-Access-Bridge/releases/latest),
-enable its Accessibility Service on the glasses, pair the R08 ring, then launch
-RokidPipe.
-
-## Main Screens
-
-- **Home**: fast access to search and service kiosk categories, with
-  focusable top sections and large list rows.
-- **Search**: empty search opens directly into the keyboard instead of forcing a
-  phone keyboard path.
-- **Video detail**: compact metadata and quick play behavior for a HUD-sized
-  screen.
-- **Player**: tap/back friendly controls with discrete choices for quality,
-  speed, subtitles, and exit.
-
-## Build
-
-Downloadable APKs are published in
-[RokidPipe releases](https://github.com/Anezium/RokidPipe/releases).
-
-```powershell
-.\gradlew.bat :app:assembleDebug
-adb -s <rokid-serial> install -r app\build\outputs\apk\debug\app-debug.apk
+```bash
+./gradlew :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## Validation
+## 테스트
 
-Validated on Rokid glasses at `480x640`.
-
-- Home top sections and list focus.
-- Search keyboard display and navigation.
-- Video detail launch from a YouTube URL.
-- Player action rail.
-- Quality, speed, subtitles, close, and exit actions.
-- Swipe debounce with paired directional key events.
-
-The latest local verification used:
-
-```powershell
-.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug
+```bash
+./gradlew :app:testDebugUnitTest          # 입력 매핑, 화질 선택
+./gradlew :app:recordPaparazziDebug       # 화면 스냅샷 → app/src/test/snapshots/images
+./gradlew :app:testDebugUnitTest -PnetworkTests=true --tests '*YouTubeNetworkTest*'  # 실제 유튜브 접속
 ```
 
-## Notes
+## 아직 확인 안 된 것
 
-This is a focused glasses fork of NewPipe, previously published under the name
-"Rokid NewPipe" and renamed to comply with the
-[NewPipe trademark policy](https://newpipe-ev.de/policy/trademark/). It is not
-the upstream NewPipe distribution, it is not built by TeamNewPipe, and the old
-phone-first README, F-Droid/store links, and upstream usage instructions were
-intentionally removed because they do not describe this Rokid build.
+- **안경 실기 테스트를 하지 않았습니다.** 실제 재생, 터치패드 입력, 음성 인식, 화면 가독성은 안경에서 확인해야 합니다.
+- 실제 유튜브 접속 테스트(`YouTubeNetworkTest`)는 개발 환경에서 youtube.com 접속이 막혀 돌려 보지 못했습니다.
+- PoToken은 안경의 WebView에서 만들어집니다. 안경 WebView가 오래되었으면 재생이 막힐 수 있습니다.
 
-## License
+## 라이선스
 
-Based on NewPipe. See [LICENSE](LICENSE).
+GPL-3.0. NewPipeExtractor와 RokidPipe/NewPipe 코드가 GPL-3.0이기 때문입니다. `YoutubeHttpDataSource`는 ExoPlayer(Apache 2.0) 코드를 기반으로 합니다.

@@ -1,0 +1,177 @@
+package com.chorockkim.rokidyoutube
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Color
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.view.Gravity
+import android.view.KeyEvent
+import android.widget.FrameLayout
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.chorockkim.rokidyoutube.data.YouTubeRepository
+import com.chorockkim.rokidyoutube.ui.GlassesInput
+import com.chorockkim.rokidyoutube.ui.HomeScreen
+import com.chorockkim.rokidyoutube.ui.Hud
+import com.chorockkim.rokidyoutube.ui.Hud.dp
+import com.chorockkim.rokidyoutube.ui.Navigator
+import com.chorockkim.rokidyoutube.ui.PlayerScreen
+import com.chorockkim.rokidyoutube.ui.Screen
+import com.chorockkim.rokidyoutube.ui.SearchScreen
+
+/**
+ * Single activity. Everything is drawn inside [band], a 480dp x 282dp area glued to the bottom
+ * edge of the glasses display; the rest stays black, i.e. transparent on the waveguide.
+ */
+class MainActivity : ComponentActivity(), Navigator {
+    private lateinit var band: FrameLayout
+    private val stack = ArrayDeque<Screen>()
+    private val input = GlassesInput()
+    private var recognizer: SpeechRecognizer? = null
+    private var pendingVoice: ((String) -> Unit)? = null
+    private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        if (it) listen() else toast("마이크 권한이 필요해요")
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        band = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+        root.addView(
+            band,
+            FrameLayout.LayoutParams(
+                dp(Hud.BAND_WIDTH_DP), dp(Hud.BAND_HEIGHT_DP),
+                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            )
+        )
+        setContentView(root)
+
+        push(
+            HomeScreen(this, this, lifecycleScope, YouTubeRepository.categories()) {
+                YouTubeRepository.kiosk(it.kioskId)
+            }
+        )
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() = dispatchAction(GlassesInput.Action.BACK)
+        })
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK) return super.dispatchKeyEvent(event)
+        return when (val action = input.map(event)) {
+            GlassesInput.Action.NONE -> super.dispatchKeyEvent(event)
+            GlassesInput.Action.DUPLICATE -> true
+            else -> { dispatchAction(action); true }
+        }
+    }
+
+    private fun dispatchAction(action: GlassesInput.Action) {
+        val consumed = stack.lastOrNull()?.onAction(action) ?: false
+        if (!consumed && action == GlassesInput.Action.BACK) back()
+    }
+
+    private fun push(screen: Screen) {
+        stack.lastOrNull()?.let {
+            it.onHidden()
+            band.removeView(it.view)
+        }
+        stack.addLast(screen)
+        band.addView(screen.view, FrameLayout.LayoutParams(-1, -1))
+        screen.onShown()
+    }
+
+    override fun back() {
+        if (stack.size <= 1) {
+            finish()
+            return
+        }
+        val top = stack.removeLast()
+        top.onHidden()
+        top.onDestroy()
+        band.removeView(top.view)
+        stack.last().let {
+            band.addView(it.view, FrameLayout.LayoutParams(-1, -1))
+            it.onShown()
+        }
+    }
+
+    override fun openSearch() {
+        push(SearchScreen(this, this, lifecycleScope) { YouTubeRepository.search(it) })
+    }
+
+    override fun openPlayer(url: String, title: String) {
+        push(PlayerScreen(this, this, lifecycleScope, url, title))
+    }
+
+    override fun onStop() {
+        super.onStop()
+        stack.lastOrNull()?.onHidden()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        stack.lastOrNull()?.onShown()
+    }
+
+    override fun onDestroy() {
+        stack.forEach { it.onDestroy() }
+        recognizer?.destroy()
+        super.onDestroy()
+    }
+
+    // region Voice search (Korean), same SpeechRecognizer flow as RokidPipe's SearchFragment
+
+    override fun startVoiceSearch(onResult: (String) -> Unit) {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            toast("음성 인식을 쓸 수 없어요")
+            return
+        }
+        pendingVoice = onResult
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+            return
+        }
+        listen()
+    }
+
+    private fun listen() {
+        val r = recognizer ?: SpeechRecognizer.createSpeechRecognizer(this).also { recognizer = it }
+        r.setRecognitionListener(object : RecognitionListener {
+            override fun onResults(results: Bundle) {
+                val text = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()?.trim()
+                if (text.isNullOrEmpty()) toast("못 알아들었어요") else pendingVoice?.invoke(text)
+            }
+
+            override fun onError(error: Int) = toast("음성 인식 실패 ($error)")
+            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onBeginningOfSpeech() {}
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onEndOfSpeech() {}
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+        r.startListening(
+            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
+                .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        )
+    }
+
+    private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+
+    // endregion
+}
