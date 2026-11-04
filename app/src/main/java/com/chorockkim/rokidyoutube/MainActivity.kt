@@ -99,16 +99,18 @@ class MainActivity : ComponentActivity(), Navigator {
         // R08 ring via R08 Access Bridge: see RingTarget.
         ringTarget = RingTarget(this, ::dispatchAction)
         band.addView(ringTarget, FrameLayout.LayoutParams(-1, -1))
-        offlineBanner = Hud.text(this, 13f, bold = true).apply {
+        // Sits just above the band, in the empty (transparent) area, so it never covers the app.
+        offlineBanner = Hud.text(this, 12f, bold = true).apply {
             text = "인터넷에 연결되어 있지 않아요"
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#FF5252"))
-            setBackgroundColor(Color.BLACK)
-            setPadding(dp(8), dp(4), dp(8), dp(4))
+            setPadding(dp(8), 0, dp(8), dp(4))
             importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO
             visibility = android.view.View.GONE
         }
-        band.addView(offlineBanner, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
+        root.addView(offlineBanner, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+            bottomMargin = dp(Hud.BAND_HEIGHT_DP)
+        })
         setContentView(root)
         watchNetwork()
 
