@@ -42,6 +42,18 @@ class VideoList(context: Context) : RecyclerView(context) {
             }
         }
 
+    /** Card height so exactly [VISIBLE_CARDS] cards fill the list, whatever screen it is on. */
+    private var cardHeightPx = dp(CARD_HEIGHT_DP)
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        val fitted = h / VISIBLE_CARDS - dp(2) // 2dp = card top + bottom margin
+        if (h > 0 && fitted != cardHeightPx) {
+            cardHeightPx = fitted
+            post { adapterImpl.notifyDataSetChanged() }
+        }
+    }
+
     /** Optional hook so tests can render thumbnails without network. */
     var thumbnailBinder: ((ImageView, VideoItem) -> Unit) = { view, item ->
         view.load(item.thumbnailUrl)
@@ -86,7 +98,6 @@ class VideoList(context: Context) : RecyclerView(context) {
         }
 
         init {
-            // 3 cards x (76 + 2) = 234dp: fits under the 44dp chip row of the 282dp band.
             root.layoutParams = RecyclerView.LayoutParams(LayoutParams.MATCH_PARENT, dp(CARD_HEIGHT_DP)).apply {
                 setMargins(dp(2), dp(1), dp(2), dp(1))
             }
@@ -115,6 +126,9 @@ class VideoList(context: Context) : RecyclerView(context) {
         }
 
         fun bind(item: VideoItem, isSelected: Boolean) {
+            if (root.layoutParams.height != cardHeightPx) {
+                root.layoutParams = root.layoutParams.apply { height = cardHeightPx }
+            }
             root.isSelected = isSelected
             title.text = item.title
             uploader.text = item.uploader
@@ -127,6 +141,8 @@ class VideoList(context: Context) : RecyclerView(context) {
     }
 
     companion object {
-        const val CARD_HEIGHT_DP = 76
+        /** Starting height before the list is measured; replaced by the fitted one. */
+        const val CARD_HEIGHT_DP = 77
+        const val VISIBLE_CARDS = 3
     }
 }

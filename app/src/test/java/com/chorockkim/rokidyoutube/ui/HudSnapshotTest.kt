@@ -82,6 +82,14 @@ class HudSnapshotTest {
     }
 
     @Test
+    fun home_offline() {
+        val home = HomeScreen(context, navigator, scope, tabs(sampleVideos)) { "계정" }
+        home.list.thumbnailBinder = ::fakeThumbnail
+        repeat(7) { home.onAction(GlassesInput.Action.NEXT) }
+        snapshot(home.view, offline = true)
+    }
+
+    @Test
     fun search_keyboard() {
         val search = SearchScreen(context, navigator, scope) { sampleVideos }
         "rick ast".forEach { c -> search.keyboard.setText(search.keyboard.text + c) }
@@ -146,7 +154,7 @@ class HudSnapshotTest {
     }
 
     /** Full 480x640 glasses display; black above the band is transparent on the glasses. */
-    private fun snapshot(band: View) {
+    private fun snapshot(band: View, offline: Boolean = false) {
         val root = FrameLayout(context).apply { setBackgroundColor(Color.BLACK) }
         root.addView(
             band,
@@ -155,6 +163,7 @@ class HudSnapshotTest {
                 Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             )
         )
+        if (offline) root.addView(Hud.offlineNotice(context), Hud.offlineNoticeParams(context))
         paparazzi.snapshot(root)
     }
 

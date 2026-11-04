@@ -78,6 +78,29 @@ object Hud {
         setPadding(context.dp(10), 0, context.dp(10), 0)
     }
 
+    val RED = Color.parseColor("#FF5252")
+
+    /**
+     * Small "no internet" pill. It goes in the empty area right above the band (see
+     * [offlineNoticeParams]) so it never covers the app; black around it stays transparent.
+     */
+    fun offlineNotice(context: Context) = text(context, 12f, RED, bold = true).apply {
+        text = "인터넷 연결 끊김"
+        gravity = Gravity.CENTER
+        setPadding(context.dp(10), context.dp(3), context.dp(10), context.dp(3))
+        background = GradientDrawable().apply {
+            setColor(Color.TRANSPARENT)
+            setStroke(context.dp(1), RED)
+            cornerRadius = context.dp(10).toFloat()
+        }
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    /** Layout params for [offlineNotice] inside the full-screen root: centered, 6dp above the band. */
+    fun offlineNoticeParams(context: Context) = android.widget.FrameLayout.LayoutParams(
+        -2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+    ).apply { bottomMargin = context.dp(BAND_HEIGHT_DP + 6) }
+
     fun formatDuration(seconds: Long): String {
         if (seconds <= 0) return ""
         val h = seconds / 3600
