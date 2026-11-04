@@ -53,7 +53,10 @@ class HudSnapshotTest {
         VideoItem("u1", "[LCK] T1 vs Gen.G 하이라이트 | 2026 LCK 서머 결승", "LCK", 1_234, 2_310_000, null, false),
         VideoItem("u2", "로블록스 99밤생존 & 라이벌시참 쭈욱 달립니다", "잼촌", 0, 5_800, null, true),
         VideoItem("u3", "Rick Astley - Never Gonna Give You Up (Official Video)", "Rick Astley", 213, 1_700_000_000, null, false),
-        VideoItem("u4", "백종원의 15분 김치찌개", "백종원 PAIK JONG WON", 905, 3_400_000, null, false)
+        VideoItem("u4", "백종원의 15분 김치찌개", "백종원 PAIK JONG WON", 905, 3_400_000, null, false),
+        VideoItem("u5", "NewJeans (뉴진스) 'Supernatural' Official MV", "HYBE LABELS", 191, 98_000_000, null, false),
+        VideoItem("u6", "서울 야경 드라이브 4K | 한강 다리 투어", "Walk Seoul", 3_725, 410_000, null, false),
+        VideoItem("u7", "침착맨 삼국지 정주행 3부", "침착맨", 7_260, 1_200_000, null, false)
     )
 
     private val categories = listOf(
@@ -75,7 +78,7 @@ class HudSnapshotTest {
     fun home_rowSelected() {
         val home = HomeScreen(context, navigator, scope, categories) { sampleVideos }
         home.list.thumbnailBinder = ::fakeThumbnail
-        repeat(7) { home.onAction(GlassesInput.Action.NEXT) } // 6 chips -> 2nd row
+        repeat(10) { home.onAction(GlassesInput.Action.NEXT) } // 6 chips -> 5th card (2nd row)
         snapshot(home.view)
     }
 

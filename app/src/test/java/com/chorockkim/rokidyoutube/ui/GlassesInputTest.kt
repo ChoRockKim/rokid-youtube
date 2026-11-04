@@ -32,6 +32,14 @@ class GlassesInputTest {
     }
 
     @Test
+    fun r08RingMediaKeysMapToSwipeAndTap() {
+        assertEquals(Action.NEXT, down(KeyEvent.KEYCODE_MEDIA_NEXT))
+        now += 500
+        assertEquals(Action.PREVIOUS, down(KeyEvent.KEYCODE_MEDIA_PREVIOUS))
+        assertEquals(Action.SELECT, down(KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE))
+    }
+
+    @Test
     fun keyUpAndRepeatsAreIgnored() {
         assertEquals(Action.NONE, input.map(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0))
         assertEquals(Action.DUPLICATE, input.map(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 1))

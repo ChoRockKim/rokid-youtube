@@ -46,7 +46,7 @@ class SearchScreen(
         view.addView(queryBar, LinearLayout.LayoutParams(-1, dp(36)).apply {
             setMargins(dp(8), dp(4), dp(8), dp(2))
         })
-        body.addView(keyboard, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+        body.addView(keyboard, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
         body.addView(results, FrameLayout.LayoutParams(-1, -1))
         body.addView(status, FrameLayout.LayoutParams(-1, -1))
         view.addView(body, LinearLayout.LayoutParams(-1, 0, 1f))

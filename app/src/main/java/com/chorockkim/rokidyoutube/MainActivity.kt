@@ -24,6 +24,7 @@ import com.chorockkim.rokidyoutube.ui.Hud
 import com.chorockkim.rokidyoutube.ui.Hud.dp
 import com.chorockkim.rokidyoutube.ui.Navigator
 import com.chorockkim.rokidyoutube.ui.PlayerScreen
+import com.chorockkim.rokidyoutube.ui.RingTarget
 import com.chorockkim.rokidyoutube.ui.Screen
 import com.chorockkim.rokidyoutube.ui.SearchScreen
 
@@ -33,6 +34,9 @@ import com.chorockkim.rokidyoutube.ui.SearchScreen
  */
 class MainActivity : ComponentActivity(), Navigator {
     private lateinit var band: FrameLayout
+    /** Holds the current screen; hidden from accessibility so [ringTarget] is the only node. */
+    private lateinit var screenHost: FrameLayout
+    private lateinit var ringTarget: RingTarget
     private val stack = ArrayDeque<Screen>()
     private val input = GlassesInput()
     private var recognizer: SpeechRecognizer? = null
@@ -52,6 +56,13 @@ class MainActivity : ComponentActivity(), Navigator {
                 Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             )
         )
+        screenHost = FrameLayout(this).apply {
+            importantForAccessibility = android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+        }
+        band.addView(screenHost, FrameLayout.LayoutParams(-1, -1))
+        // R08 ring via R08 Access Bridge: see RingTarget.
+        ringTarget = RingTarget(this, ::dispatchAction)
+        band.addView(ringTarget, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
 
         push(
@@ -74,7 +85,7 @@ class MainActivity : ComponentActivity(), Navigator {
         }
     }
 
-    private fun dispatchAction(action: GlassesInput.Action) {
+    fun dispatchAction(action: GlassesInput.Action) {
         val consumed = stack.lastOrNull()?.onAction(action) ?: false
         if (!consumed && action == GlassesInput.Action.BACK) back()
     }
@@ -82,11 +93,12 @@ class MainActivity : ComponentActivity(), Navigator {
     private fun push(screen: Screen) {
         stack.lastOrNull()?.let {
             it.onHidden()
-            band.removeView(it.view)
+            screenHost.removeView(it.view)
         }
         stack.addLast(screen)
-        band.addView(screen.view, FrameLayout.LayoutParams(-1, -1))
+        screenHost.addView(screen.view, FrameLayout.LayoutParams(-1, -1))
         screen.onShown()
+        ringTarget.requestFocus()
     }
 
     override fun back() {
@@ -97,11 +109,12 @@ class MainActivity : ComponentActivity(), Navigator {
         val top = stack.removeLast()
         top.onHidden()
         top.onDestroy()
-        band.removeView(top.view)
+        screenHost.removeView(top.view)
         stack.last().let {
-            band.addView(it.view, FrameLayout.LayoutParams(-1, -1))
+            screenHost.addView(it.view, FrameLayout.LayoutParams(-1, -1))
             it.onShown()
         }
+        ringTarget.requestFocus()
     }
 
     override fun openSearch() {
