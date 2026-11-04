@@ -171,7 +171,10 @@ class MainActivity : ComponentActivity(), Navigator {
             AccountScreen(
                 this, this, lifecycleScope, app.auth,
                 clearHistory = { app.history.clear() },
-                onAccountChanged = { home.reload() }
+                onAccountChanged = {
+                    app.recommendations.invalidate()
+                    home.reload()
+                }
             )
         )
     }
@@ -179,8 +182,8 @@ class MainActivity : ComponentActivity(), Navigator {
     /** Personal feeds instead of YouTube categories (see README for what each one uses). */
     private fun homeTabs() = listOf(
         HomeScreen.Tab("추천", "아직 추천할 게 없어요", reloadOnReturn = true) {
-            // Built from what was watched on these glasses; popular videos until there is history.
-            app.history.recommendations().ifEmpty { YouTubeRepository.popular() }
+            // Watch history + (signed in) liked videos and subscriptions; popular until there is any.
+            app.recommendations.feed().ifEmpty { YouTubeRepository.popular() }
         },
         HomeScreen.Tab("이어보기", "이어 볼 영상이 없어요", reloadOnReturn = true) {
             app.history.continueWatching()

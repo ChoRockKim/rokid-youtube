@@ -7,6 +7,8 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.chorockkim.rokidyoutube.auth.GoogleAuth
 import com.chorockkim.rokidyoutube.auth.PrefsTokenStore
+import com.chorockkim.rokidyoutube.data.Recommendations
+import com.chorockkim.rokidyoutube.data.VideoItem
 import com.chorockkim.rokidyoutube.data.WatchHistory
 import com.chorockkim.rokidyoutube.data.YouTubeAccountApi
 import com.chorockkim.rokidyoutube.net.OkHttpDownloader
@@ -41,6 +43,13 @@ class RokidYouTubeApp : Application(), SingletonImageLoader.Factory {
     }
     val accountApi by lazy { YouTubeAccountApi(OkHttpDownloader.get().client) { auth.accessToken() } }
     val history by lazy { WatchHistory(File(filesDir, "watch_history.json")) }
+    val recommendations by lazy {
+        Recommendations(history, object : Recommendations.Account {
+            override val isSignedIn get() = auth.isSignedIn
+            override suspend fun likedVideos(): List<VideoItem> = accountApi.likedVideos()
+            override suspend fun subscriptionUploads(): List<VideoItem> = accountApi.subscriptionFeed()
+        })
+    }
 
     companion object {
         lateinit var instance: RokidYouTubeApp

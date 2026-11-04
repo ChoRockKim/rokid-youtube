@@ -22,7 +22,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfoItem
 /**
  * The signed-in parts of the home screen, through the official YouTube Data API v3
  * (read-only scope). Same idea as Herald's Watchlight: subscriptions and liked videos.
- * The Data API has no "recommended for you" endpoint; that part is built locally from history.
+ * The Data API has no "recommended for you" endpoint; see [Recommendations] for the "추천" feed.
  */
 class YouTubeAccountApi(
     private val http: OkHttpClient,
