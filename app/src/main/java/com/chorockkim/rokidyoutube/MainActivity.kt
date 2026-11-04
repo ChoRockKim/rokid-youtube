@@ -130,7 +130,11 @@ class MainActivity : ComponentActivity(), Navigator {
     }
 
     fun dispatchAction(action: GlassesInput.Action) {
-        val consumed = stack.lastOrNull()?.onAction(action) ?: false
+        val top = stack.lastOrNull()
+        var consumed = top?.onAction(action) ?: false
+        // Vertical swipes fall back to previous / next on screens that don't use them.
+        if (!consumed && action == GlassesInput.Action.UP) consumed = top?.onAction(GlassesInput.Action.PREVIOUS) ?: false
+        if (!consumed && action == GlassesInput.Action.DOWN) consumed = top?.onAction(GlassesInput.Action.NEXT) ?: false
         if (!consumed && action == GlassesInput.Action.BACK) back()
     }
 

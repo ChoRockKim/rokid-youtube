@@ -119,6 +119,18 @@ class HudSnapshotTest {
     }
 
     @Test
+    fun player_shrunkTo50Percent() {
+        val player = PlayerScreen(context, navigator, scope, sampleVideos[2], playerFactory = null)
+        // The gradient sits on the video view itself here so the scaling shows up.
+        player.videoView.foreground = gradient(2)
+        player.setControlsVisible(false)
+        repeat(10) { player.onAction(GlassesInput.Action.UP) } // start from 100%
+        repeat(5) { player.onAction(GlassesInput.Action.DOWN) }
+        snapshot(player.view)
+        repeat(10) { player.onAction(GlassesInput.Action.UP) } // leave the saved size at 100%
+    }
+
+    @Test
     fun account_deviceCode() {
         val auth = com.chorockkim.rokidyoutube.auth.GoogleAuth(
             "id", "secret",

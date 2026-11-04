@@ -40,6 +40,15 @@ class GlassesInputTest {
     }
 
     @Test
+    fun verticalSwipesAreTheirOwnActions() {
+        assertEquals(Action.UP, down(KeyEvent.KEYCODE_DPAD_UP))
+        now += 500
+        assertEquals(Action.DOWN, down(KeyEvent.KEYCODE_DPAD_DOWN))
+        now += 100
+        assertEquals(Action.DUPLICATE, down(KeyEvent.KEYCODE_DPAD_DOWN))
+    }
+
+    @Test
     fun keyUpAndRepeatsAreIgnored() {
         assertEquals(Action.NONE, input.map(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER, 0))
         assertEquals(Action.DUPLICATE, input.map(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER, 1))

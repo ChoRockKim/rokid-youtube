@@ -11,7 +11,11 @@ import android.view.KeyEvent
  * with the bridge running its accessibility service consumes them and drives [RingTarget].
  */
 class GlassesInput(private val clock: () -> Long = SystemClock::elapsedRealtime) {
-    enum class Action { NONE, DUPLICATE, PREVIOUS, NEXT, SELECT, BACK }
+    /**
+     * [UP] / [DOWN] are vertical swipes (DPAD up/down). Screens that don't handle them get them
+     * as [PREVIOUS] / [NEXT] (see MainActivity), so lists move the same as before.
+     */
+    enum class Action { NONE, DUPLICATE, PREVIOUS, NEXT, UP, DOWN, SELECT, BACK }
 
     private var lastDirectionAt = 0L
 
@@ -21,11 +25,14 @@ class GlassesInput(private val clock: () -> Long = SystemClock::elapsedRealtime)
         if (eventAction != KeyEvent.ACTION_DOWN) return Action.NONE
         if (repeatCount > 0) return Action.DUPLICATE
         return when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_UP, KEYCODE_ROKID_PREVIOUS,
+            KeyEvent.KEYCODE_DPAD_UP -> debounce(Action.UP)
+            KeyEvent.KEYCODE_DPAD_DOWN -> debounce(Action.DOWN)
+
+            KeyEvent.KEYCODE_DPAD_LEFT, KEYCODE_ROKID_PREVIOUS,
             KeyEvent.KEYCODE_MEDIA_PREVIOUS ->
                 debounce(Action.PREVIOUS)
 
-            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_DPAD_DOWN, KEYCODE_ROKID_NEXT,
+            KeyEvent.KEYCODE_DPAD_RIGHT, KEYCODE_ROKID_NEXT,
             KeyEvent.KEYCODE_MEDIA_NEXT ->
                 debounce(Action.NEXT)
 

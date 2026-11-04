@@ -33,6 +33,7 @@ import org.schabi.newpipe.extractor.stream.StreamInfo
  * Player filling the HUD band. Controls (one row of buttons + progress) appear on tap and hide
  * after a few seconds. Hidden: swipe = seek ±10s, tap = show controls, back = close.
  * Shown: swipe walks the buttons, tap presses, back hides the controls.
+ * Always: swipe down shrinks the video by 10% (down to 20%), swipe up grows it back (up to 100%).
  */
 class PlayerScreen(
     context: Context,
@@ -56,6 +57,16 @@ class PlayerScreen(
         setKeepContentOnPlayerReset(true)
     }
     private val status = Hud.text(context, 15f, Hud.GREY).apply { gravity = Gravity.CENTER }
+
+    private val prefs = context.getSharedPreferences("player", Context.MODE_PRIVATE)
+    /** Video size in percent of the band, kept across videos and restarts. */
+    private var sizePercent = prefs.getInt(KEY_SIZE, MAX_SIZE).coerceIn(MIN_SIZE, MAX_SIZE)
+    private val sizeLabel = Hud.text(context, 14f, bold = true).apply {
+        setBackgroundColor(Hud.SCRIM)
+        setPadding(dp(10), dp(4), dp(10), dp(4))
+        visibility = View.GONE
+    }
+    private val hideSizeLabel = Runnable { sizeLabel.visibility = View.GONE }
 
     private val controls = FrameLayout(context)
     private val titleView = Hud.text(context, 14f, bold = true).apply {
@@ -108,6 +119,8 @@ class PlayerScreen(
     init {
         view.addView(videoView, FrameLayout.LayoutParams(-1, -1))
         view.addView(status, FrameLayout.LayoutParams(-1, -1))
+        view.addView(sizeLabel, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        applySize()
 
         controls.addView(titleView, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
         val bottom = LinearLayout(context).apply {
@@ -242,6 +255,29 @@ class PlayerScreen(
         play(streamInfo, startAtMs = player?.currentPosition ?: 0L)
     }
 
+    private fun resizeBy(deltaPercent: Int) {
+        val next = (sizePercent + deltaPercent).coerceIn(MIN_SIZE, MAX_SIZE)
+        if (next != sizePercent) {
+            sizePercent = next
+            prefs.edit().apply {
+                putInt(KEY_SIZE, next)
+                apply()
+            }
+            applySize()
+        }
+        sizeLabel.text = "화면 크기 $sizePercent%"
+        sizeLabel.visibility = View.VISIBLE
+        handler.removeCallbacks(hideSizeLabel)
+        handler.postDelayed(hideSizeLabel, 1_200)
+    }
+
+    /** Scales only the video picture around the band's center; controls keep their size. */
+    private fun applySize() {
+        val scale = sizePercent / 100f
+        videoView.scaleX = scale
+        videoView.scaleY = scale
+    }
+
     private fun setStatus(text: String?) {
         status.text = text
         status.visibility = if (text == null) View.GONE else View.VISIBLE
@@ -293,6 +329,10 @@ class PlayerScreen(
                 }
                 true
             }
+            Action.UP, Action.DOWN -> {
+                resizeBy(if (action == Action.UP) SIZE_STEP else -SIZE_STEP)
+                true
+            }
             Action.SELECT -> {
                 if (shown) rail[railCursor].second() else moveRail(0)
                 setControlsVisible(true)
@@ -310,5 +350,9 @@ class PlayerScreen(
 
     private companion object {
         const val HIDE_AFTER_MS = 4_000L
+        const val KEY_SIZE = "videoSizePercent"
+        const val MIN_SIZE = 20
+        const val MAX_SIZE = 100
+        const val SIZE_STEP = 10
     }
 }
