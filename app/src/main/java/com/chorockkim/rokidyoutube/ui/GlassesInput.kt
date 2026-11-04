@@ -15,7 +15,7 @@ class GlassesInput(private val clock: () -> Long = SystemClock::elapsedRealtime)
      * [UP] / [DOWN] are vertical swipes (DPAD up/down). Screens that don't handle them get them
      * as [PREVIOUS] / [NEXT] (see MainActivity), so lists move the same as before.
      */
-    enum class Action { NONE, DUPLICATE, PREVIOUS, NEXT, UP, DOWN, SELECT, BACK }
+    enum class Action { NONE, DUPLICATE, PREVIOUS, NEXT, UP, DOWN, SELECT, BACK, VOLUME_UP, VOLUME_DOWN }
 
     private var lastDirectionAt = 0L
 
@@ -23,6 +23,9 @@ class GlassesInput(private val clock: () -> Long = SystemClock::elapsedRealtime)
 
     fun map(eventAction: Int, keyCode: Int, repeatCount: Int): Action {
         if (eventAction != KeyEvent.ACTION_DOWN) return Action.NONE
+        // Volume keys repeat while held: every repeat is one more step.
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) return Action.VOLUME_UP
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) return Action.VOLUME_DOWN
         if (repeatCount > 0) return Action.DUPLICATE
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> debounce(Action.UP)

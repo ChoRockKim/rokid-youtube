@@ -83,6 +83,9 @@ class MainActivity : ComponentActivity(), Navigator {
         super.onCreate(savedInstanceState)
         // Keep the glasses display on while the app is open, not only during playback.
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        // Volume keys always change the media volume, also while nothing is playing (otherwise
+        // they change the ring / notification volume there).
+        volumeControlStream = android.media.AudioManager.STREAM_MUSIC
         val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         band = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         root.addView(
@@ -102,6 +105,7 @@ class MainActivity : ComponentActivity(), Navigator {
         // Sits just above the band, in the empty (transparent) area, so it never covers the app.
         offlineBanner = Hud.offlineNotice(this).apply { visibility = android.view.View.GONE }
         root.addView(offlineBanner, Hud.offlineNoticeParams(this))
+        root.addView(com.chorockkim.rokidyoutube.ui.StatusIndicator(this), com.chorockkim.rokidyoutube.ui.StatusIndicator.params(this))
         setContentView(root)
         watchNetwork()
 
@@ -109,7 +113,7 @@ class MainActivity : ComponentActivity(), Navigator {
         push(home)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() = dispatchAction(GlassesInput.Action.BACK)
+            override fun handleOnBackPressed() { dispatchAction(GlassesInput.Action.BACK) }
         })
     }
 
@@ -118,17 +122,25 @@ class MainActivity : ComponentActivity(), Navigator {
         return when (val action = input.map(event)) {
             GlassesInput.Action.NONE -> super.dispatchKeyEvent(event)
             GlassesInput.Action.DUPLICATE -> true
+            // Volume keys: fine steps in the player, the normal system volume elsewhere.
+            GlassesInput.Action.VOLUME_UP, GlassesInput.Action.VOLUME_DOWN ->
+                dispatchAction(action) || super.dispatchKeyEvent(event)
             else -> { dispatchAction(action); true }
         }
     }
 
-    fun dispatchAction(action: GlassesInput.Action) {
+    /** Returns whether a screen (or going back) handled [action]. */
+    fun dispatchAction(action: GlassesInput.Action): Boolean {
         val top = stack.lastOrNull()
         var consumed = top?.onAction(action) ?: false
         // Vertical swipes fall back to previous / next on screens that don't use them.
         if (!consumed && action == GlassesInput.Action.UP) consumed = top?.onAction(GlassesInput.Action.PREVIOUS) ?: false
         if (!consumed && action == GlassesInput.Action.DOWN) consumed = top?.onAction(GlassesInput.Action.NEXT) ?: false
-        if (!consumed && action == GlassesInput.Action.BACK) back()
+        if (!consumed && action == GlassesInput.Action.BACK) {
+            back()
+            consumed = true
+        }
+        return consumed
     }
 
     private fun push(screen: Screen) {

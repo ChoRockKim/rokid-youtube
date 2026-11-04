@@ -15,6 +15,7 @@ import android.widget.TextView
 import com.chorockkim.rokidyoutube.data.VideoItem
 import com.chorockkim.rokidyoutube.data.WatchHistory
 import com.chorockkim.rokidyoutube.data.YouTubeRepository
+import com.chorockkim.rokidyoutube.player.FineVolume
 import com.chorockkim.rokidyoutube.player.StreamSelector
 import com.chorockkim.rokidyoutube.player.YoutubeMediaSources
 import com.chorockkim.rokidyoutube.ui.GlassesInput.Action
@@ -33,7 +34,9 @@ import org.schabi.newpipe.extractor.stream.StreamInfo
  * Player filling the HUD band. Controls (one row of buttons + progress) appear on tap and hide
  * after a few seconds. Hidden: swipe = seek ±10s, tap = show controls, back = close.
  * Shown: swipe walks the buttons, tap presses, back hides the controls.
- * Always: swipe down shrinks the video by 10% (down to 20%), swipe up grows it back (up to 100%).
+ * [크기] / [볼륨] open an adjust panel: front/back swipes change the video size (10% steps,
+ * 20-100%) or the volume (5% steps, see [FineVolume]); tap or back closes it. The volume keys
+ * also change the volume in 5% steps, and DPAD up/down (if the device sends them) the size.
  */
 class PlayerScreen(
     context: Context,
@@ -61,12 +64,35 @@ class PlayerScreen(
     private val prefs = context.getSharedPreferences("player", Context.MODE_PRIVATE)
     /** Video size in percent of the band, kept across videos and restarts. */
     private var sizePercent = prefs.getInt(KEY_SIZE, MAX_SIZE).coerceIn(MIN_SIZE, MAX_SIZE)
-    private val sizeLabel = Hud.text(context, 14f, bold = true).apply {
-        setBackgroundColor(Hud.SCRIM)
-        setPadding(dp(10), dp(4), dp(10), dp(4))
+    private val volume: FineVolume? = if (playerFactory != null) FineVolume(context) else null
+
+    /** What front/back swipes change while an adjust panel is open. */
+    private enum class Adjust { NONE, SIZE, VOLUME }
+    private var adjust = Adjust.NONE
+
+    // Centered adjust panel: "화면 크기" / "80%" / hint.
+    private val adjustTitle = Hud.text(context, 12f, Hud.GREY).apply { gravity = Gravity.CENTER }
+    private val adjustValue = Hud.text(context, 26f, Hud.GREEN, bold = true).apply { gravity = Gravity.CENTER }
+    private val adjustHint = Hud.text(context, 11f, Hud.GREY).apply {
+        gravity = Gravity.CENTER
+        setLineSpacing(context.dp(2).toFloat(), 1f)
+    }
+    private val adjustPanel = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setPadding(dp(18), dp(8), dp(18), dp(10))
+        minimumWidth = dp(150)
+        background = GradientDrawable().apply {
+            setColor(Hud.SCRIM)
+            setStroke(dp(1), Hud.DIM_GREEN)
+            cornerRadius = dp(8).toFloat()
+        }
+        addView(adjustTitle)
+        addView(adjustValue, LinearLayout.LayoutParams(-2, -2).apply { setMargins(0, dp(4), 0, dp(4)) })
+        addView(adjustHint, LinearLayout.LayoutParams(-2, -2))
         visibility = View.GONE
     }
-    private val hideSizeLabel = Runnable { sizeLabel.visibility = View.GONE }
+    private val hideAdjustPanel = Runnable { if (adjust == Adjust.NONE) adjustPanel.visibility = View.GONE }
 
     private val controls = FrameLayout(context)
     private val titleView = Hud.text(context, 14f, bold = true).apply {
@@ -92,6 +118,8 @@ class PlayerScreen(
         playPause to ::togglePlay,
         Hud.button(context, "-10초", 12f) to { seekBy(-10_000) },
         Hud.button(context, "+10초", 12f) to { seekBy(10_000) },
+        Hud.button(context, "크기", 12f) to { startAdjust(Adjust.SIZE) },
+        Hud.button(context, "볼륨", 12f) to { startAdjust(Adjust.VOLUME) },
         qualityButton to ::nextQuality,
         Hud.button(context, "닫기", 12f) to { navigator.back() }
     )
@@ -119,7 +147,6 @@ class PlayerScreen(
     init {
         view.addView(videoView, FrameLayout.LayoutParams(-1, -1))
         view.addView(status, FrameLayout.LayoutParams(-1, -1))
-        view.addView(sizeLabel, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         applySize()
 
         controls.addView(titleView, FrameLayout.LayoutParams(-1, -2, Gravity.TOP))
@@ -153,6 +180,7 @@ class PlayerScreen(
         bottom.addView(seekRow, LinearLayout.LayoutParams(-1, dp(24)))
         controls.addView(bottom, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
         view.addView(controls, FrameLayout.LayoutParams(-1, -1))
+        view.addView(adjustPanel, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
 
         moveRail(0)
         renderTimes(0, 0)
@@ -162,6 +190,7 @@ class PlayerScreen(
         if (player == null && playerFactory != null) {
             player = playerFactory.invoke().also { p ->
                 videoView.player = p
+                p.volume = volume?.gain ?: 1f
                 p.addListener(object : Player.Listener {
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         playPause.text = if (isPlaying) "일시정지" else "재생"
@@ -265,11 +294,39 @@ class PlayerScreen(
             }
             applySize()
         }
-        sizeLabel.text = "화면 크기 $sizePercent%"
-        sizeLabel.visibility = View.VISIBLE
-        handler.removeCallbacks(hideSizeLabel)
-        handler.postDelayed(hideSizeLabel, 1_200)
     }
+
+    private fun changeVolume(steps: Int) {
+        val v = volume ?: return
+        v.change(steps)
+        player?.volume = v.gain
+    }
+
+    /** Opens the adjust panel; front/back swipes then change the value, tap or back closes it. */
+    private fun startAdjust(mode: Adjust) {
+        adjust = mode
+        setControlsVisible(false)
+        renderAdjust(mode, hint = true)
+    }
+
+    private fun endAdjust() {
+        adjust = Adjust.NONE
+        adjustPanel.visibility = View.GONE
+    }
+
+    private fun renderAdjust(mode: Adjust, hint: Boolean) {
+        adjustTitle.text = if (mode == Adjust.SIZE) "화면 크기" else "볼륨"
+        adjustValue.text = "${if (mode == Adjust.SIZE) sizePercent else volume?.percent ?: 100}%"
+        adjustHint.text = "앞뒤로 쓸어서 조절\n탭하면 완료"
+        adjustHint.visibility = if (hint) View.VISIBLE else View.GONE
+        adjustPanel.visibility = View.VISIBLE
+        handler.removeCallbacks(hideAdjustPanel)
+        // A quick change from the volume keys (no adjust mode) shows the value briefly.
+        if (adjust == Adjust.NONE) handler.postDelayed(hideAdjustPanel, 1_200)
+    }
+
+    /** For snapshots: show the adjust panel as it looks after tapping [크기]. */
+    internal fun showSizeAdjustForPreview() = startAdjust(Adjust.SIZE)
 
     /** Scales only the video picture around the band's center; controls keep their size. */
     private fun applySize() {
@@ -317,6 +374,24 @@ class PlayerScreen(
     }
 
     override fun onAction(action: Action): Boolean {
+        if (action == Action.VOLUME_UP || action == Action.VOLUME_DOWN) {
+            changeVolume(if (action == Action.VOLUME_UP) 1 else -1)
+            renderAdjust(Adjust.VOLUME, hint = adjust == Adjust.VOLUME)
+            return true
+        }
+        if (adjust != Adjust.NONE) {
+            when (action) {
+                Action.NEXT, Action.PREVIOUS, Action.UP, Action.DOWN -> {
+                    val up = action == Action.NEXT || action == Action.UP
+                    if (adjust == Adjust.SIZE) resizeBy(if (up) SIZE_STEP else -SIZE_STEP)
+                    else changeVolume(if (up) 1 else -1)
+                    renderAdjust(adjust, hint = true)
+                }
+                Action.SELECT, Action.BACK -> endAdjust()
+                else -> return false
+            }
+            return true
+        }
         val shown = controls.visibility == View.VISIBLE
         return when (action) {
             Action.NEXT, Action.PREVIOUS -> {
@@ -331,6 +406,7 @@ class PlayerScreen(
             }
             Action.UP, Action.DOWN -> {
                 resizeBy(if (action == Action.UP) SIZE_STEP else -SIZE_STEP)
+                renderAdjust(Adjust.SIZE, hint = false)
                 true
             }
             Action.SELECT -> {

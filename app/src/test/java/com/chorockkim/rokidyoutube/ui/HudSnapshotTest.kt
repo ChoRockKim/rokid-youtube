@@ -139,6 +139,15 @@ class HudSnapshotTest {
     }
 
     @Test
+    fun player_sizeAdjust() {
+        val player = PlayerScreen(context, navigator, scope, sampleVideos[2], playerFactory = null)
+        player.videoView.visibility = View.INVISIBLE
+        player.view.background = gradient(2)
+        player.showSizeAdjustForPreview()
+        snapshot(player.view)
+    }
+
+    @Test
     fun account_deviceCode() {
         val auth = com.chorockkim.rokidyoutube.auth.GoogleAuth(
             "id", "secret",
@@ -164,6 +173,10 @@ class HudSnapshotTest {
             )
         )
         if (offline) root.addView(Hud.offlineNotice(context), Hud.offlineNoticeParams(context))
+        root.addView(
+            StatusIndicator(context).apply { show(82, charging = false, time = "14:32") },
+            StatusIndicator.params(context)
+        )
         paparazzi.snapshot(root)
     }
 
