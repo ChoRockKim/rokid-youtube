@@ -140,6 +140,16 @@ class HudSnapshotTest {
     }
 
     @Test
+    fun player_swipeSeek() {
+        val player = PlayerScreen(context, navigator, scope, sampleVideos[2], playerFactory = null)
+        player.videoView.visibility = View.INVISIBLE
+        player.view.background = gradient(2)
+        player.setControlsVisible(false)
+        player.showSeekToastForPreview("+10초 · 2:13 / 3:33")
+        snapshot(player.view)
+    }
+
+    @Test
     fun player_sizeAdjust() {
         val player = PlayerScreen(context, navigator, scope, sampleVideos[2], playerFactory = null)
         player.videoView.visibility = View.INVISIBLE

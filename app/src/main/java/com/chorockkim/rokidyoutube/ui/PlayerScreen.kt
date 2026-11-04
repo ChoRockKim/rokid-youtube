@@ -33,8 +33,9 @@ import kotlinx.coroutines.launch
 import org.schabi.newpipe.extractor.stream.StreamInfo
 
 /**
- * Player filling the HUD band. Controls (one row of buttons + progress) appear on tap and hide
- * after a few seconds. Hidden: swipe = seek ±10s, tap = show controls, back = close.
+ * Player filling the HUD band. Controls (one row of buttons + progress) appear only on a tap and
+ * hide after a few seconds. Hidden: swipe = seek ±10s (small time pill, no controls), tap = show
+ * controls, back = close.
  * Shown: swipe walks the buttons, tap presses, back hides the controls.
  * [크기] / [가림] / [볼륨] open an adjust panel: front/back swipes change the video size (10%
  * steps, 20-100%), the privacy filter (see [PrivacyFilter]) or the volume (5% steps, see
@@ -65,6 +66,17 @@ class PlayerScreen(
     }
     private val textureView = TextureView(context)
     private val status = Hud.text(context, 15f, Hud.GREY).apply { gravity = Gravity.CENTER }
+
+    /** Small "+10초 · 2:13 / 3:33" pill after a swipe-seek, instead of opening the controls. */
+    private val seekToast = Hud.text(context, 12f, bold = true).apply {
+        setPadding(dp(10), dp(3), dp(10), dp(3))
+        background = GradientDrawable().apply {
+            setColor(Hud.SCRIM)
+            cornerRadius = dp(10).toFloat()
+        }
+        visibility = View.GONE
+    }
+    private val hideSeekToast = Runnable { seekToast.visibility = View.GONE }
 
     private val prefs = context.getSharedPreferences("player", Context.MODE_PRIVATE)
     /** Video size in percent of the band, kept across videos and restarts. */
@@ -123,8 +135,6 @@ class PlayerScreen(
     private val qualityButton = Hud.button(context, "480p", 12f)
     private val rail: List<Pair<TextView, () -> Unit>> = listOf(
         playPause to ::togglePlay,
-        Hud.button(context, "-10초", 12f) to { seekBy(-10_000) },
-        Hud.button(context, "+10초", 12f) to { seekBy(10_000) },
         Hud.button(context, "크기", 12f) to { startAdjust(Adjust.SIZE) },
         Hud.button(context, "가림", 12f) to { startAdjust(Adjust.PRIVACY) },
         Hud.button(context, "볼륨", 12f) to { startAdjust(Adjust.VOLUME) },
@@ -200,6 +210,9 @@ class PlayerScreen(
         controls.addView(bottom, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
         view.addView(controls, FrameLayout.LayoutParams(-1, -1))
         view.addView(adjustPanel, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        view.addView(seekToast, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+            bottomMargin = dp(10)
+        })
 
         moveRail(0)
         renderTimes(0, 0)
@@ -219,18 +232,20 @@ class PlayerScreen(
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         playPause.text = if (isPlaying) "멈춤" else "재생"
-                        if (isPlaying) scheduleHide() else setControlsVisible(true)
+                        // Controls only ever open on a tap; a pause (incl. buffering after a seek)
+                        // just keeps them open if they already are.
+                        if (isPlaying) scheduleHide() else handler.removeCallbacks(hideControls)
                     }
 
                     override fun onPlaybackStateChanged(state: Int) {
                         if (state == Player.STATE_BUFFERING) setStatus("버퍼링…")
                         if (state == Player.STATE_READY) setStatus(null)
-                        if (state == Player.STATE_ENDED) setControlsVisible(true)
+                        // No controls pop up at the end either; just say so.
+                        if (state == Player.STATE_ENDED) setStatus("끝났어요\n탭하면 메뉴")
                     }
 
                     override fun onPlayerError(error: PlaybackException) {
                         setStatus("재생 오류\n${error.errorCodeName}")
-                        setControlsVisible(true)
                     }
                 })
             }
@@ -297,6 +312,24 @@ class PlayerScreen(
         val target = (p.currentPosition + deltaMs).coerceAtLeast(0)
         p.seekTo(if (p.duration > 0) target.coerceAtMost(p.duration) else target)
         updateProgress()
+    }
+
+    private fun showSeekToast(label: String) {
+        val p = player
+        seekToast.text = if (p == null) label else {
+            val pos = Hud.formatDuration(p.currentPosition / 1000).ifEmpty { "0:00" }
+            val dur = Hud.formatDuration(p.duration.coerceAtLeast(0) / 1000)
+            if (dur.isEmpty()) "$label · $pos" else "$label · $pos / $dur"
+        }
+        seekToast.visibility = View.VISIBLE
+        handler.removeCallbacks(hideSeekToast)
+        handler.postDelayed(hideSeekToast, 1_000)
+    }
+
+    /** For snapshots. */
+    internal fun showSeekToastForPreview(text: String) {
+        seekToast.text = text
+        seekToast.visibility = View.VISIBLE
     }
 
     /** Steps down through the available heights and wraps to the highest one. */
@@ -459,7 +492,7 @@ class PlayerScreen(
                     scheduleHide()
                 } else {
                     seekBy(if (action == Action.NEXT) 10_000 else -10_000)
-                    setControlsVisible(true)
+                    showSeekToast(if (action == Action.NEXT) "+10초" else "-10초")
                 }
                 true
             }
