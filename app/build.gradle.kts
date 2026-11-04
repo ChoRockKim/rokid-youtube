@@ -15,6 +15,7 @@ plugins {
     alias(libs.plugins.jetbrains.kotlinx.serialization)
     alias(libs.plugins.sonarqube)
     alias(libs.plugins.about.libraries)
+    alias(libs.plugins.paparazzi) // HUD band layout snapshots, see RokidHudSnapshotTest
     checkstyle
 }
 

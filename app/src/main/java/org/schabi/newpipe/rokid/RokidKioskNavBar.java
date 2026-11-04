@@ -12,6 +12,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
@@ -105,7 +106,8 @@ public final class RokidKioskNavBar {
     }
 
     @NonNull
-    private static TextView createButton(
+    @VisibleForTesting
+    static TextView createButton(
             @NonNull final Context context,
             @NonNull final RokidKioskNavigator.KioskNavItem item
     ) {
