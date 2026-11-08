@@ -279,20 +279,42 @@ class MainActivity : ComponentActivity(), Navigator {
 
     override fun onStop() {
         super.onStop()
+        wifiEnabler.stop()
         stack.lastOrNull()?.onHidden()
     }
 
     override fun onStart() {
         super.onStart()
+        wifiEnabler.start()
         stack.lastOrNull()?.onShown()
     }
 
     // region Offline notice
 
+    private var online = true
+    private var wifiStatus: com.chorockkim.rokidyoutube.net.WifiEnabler.Status? = null
+    /** Turns Wi-Fi back on through the rokid-conversate helper app while the app is open. */
+    private val wifiEnabler by lazy {
+        com.chorockkim.rokidyoutube.net.WifiEnabler(this) { status ->
+            runOnUiThread {
+                wifiStatus = status
+                renderNetwork()
+            }
+        }
+    }
+
+    /** The red pill above the band: Wi-Fi state first, then "no internet". */
+    private fun renderNetwork() {
+        val text = com.chorockkim.rokidyoutube.net.WifiEnabler.label(wifiStatus, online)
+        offlineBanner.text = text
+        offlineBanner.visibility = if (text == null) android.view.View.GONE else android.view.View.VISIBLE
+    }
+
     private fun watchNetwork() {
         val cm = getSystemService(android.net.ConnectivityManager::class.java) ?: return
-        fun show(online: Boolean) = runOnUiThread {
-            offlineBanner.visibility = if (online) android.view.View.GONE else android.view.View.VISIBLE
+        fun show(isOnline: Boolean) = runOnUiThread {
+            online = isOnline
+            renderNetwork()
         }
         fun hasInternet(caps: android.net.NetworkCapabilities?) =
             caps?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) == true

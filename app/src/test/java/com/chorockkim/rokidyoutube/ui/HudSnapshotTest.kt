@@ -94,6 +94,14 @@ class HudSnapshotTest {
     }
 
     @Test
+    fun home_wifiOff() {
+        val home = HomeScreen(context, navigator, scope, tabs(sampleVideos)) { "계정" }
+        home.list.thumbnailBinder = ::fakeThumbnail
+        snapshot(home.view, wifi = com.chorockkim.rokidyoutube.net.WifiEnabler.label(
+            com.chorockkim.rokidyoutube.net.WifiEnabler.Status.CANNOT_ENABLE, online = false))
+    }
+
+    @Test
     fun home_charging() {
         val home = HomeScreen(context, navigator, scope, tabs(sampleVideos)) { "계정" }
         home.list.thumbnailBinder = ::fakeThumbnail
@@ -252,7 +260,7 @@ class HudSnapshotTest {
     }
 
     /** Full 480x640 glasses display; black above the band is transparent on the glasses. */
-    private fun snapshot(band: View, offline: Boolean = false, update: String? = null, charging: Boolean = false) {
+    private fun snapshot(band: View, offline: Boolean = false, update: String? = null, charging: Boolean = false, wifi: String? = null) {
         val root = FrameLayout(context).apply { setBackgroundColor(Color.BLACK) }
         root.addView(
             band,
@@ -262,6 +270,9 @@ class HudSnapshotTest {
             )
         )
         if (offline) root.addView(Hud.offlineNotice(context), Hud.offlineNoticeParams(context))
+        if (wifi != null) {
+            root.addView(Hud.offlineNotice(context).apply { text = wifi }, Hud.offlineNoticeParams(context))
+        }
         if (update != null) {
             root.addView(Hud.updateNotice(context).apply { text = "새 버전 v$update" }, Hud.updateNoticeParams(context))
         }
