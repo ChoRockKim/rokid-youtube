@@ -195,11 +195,7 @@ class HudSnapshotTest {
     fun update_available() {
         val screen = UpdateScreen(context, navigator, scope, updater = null)
         screen.showAvailable(
-            com.chorockkim.rokidyoutube.update.Release(
-                "v0.2.1", "0.2.1", 201,
-                "## 바뀐 점\n- 영상 가림 필터 개선\n- 볼륨 조절이 더 부드러워졌어요",
-                "https://x/a.apk", 9_800_000, null, null
-            )
+            com.chorockkim.rokidyoutube.update.Release("0.2.1", 201, 7_481_342, "ab".repeat(32))
         )
         snapshot(screen.view, update = "0.2.1")
     }

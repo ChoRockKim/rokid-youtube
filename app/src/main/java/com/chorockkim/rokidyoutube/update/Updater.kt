@@ -20,8 +20,13 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 /**
- * Over-the-air updates from the GitHub releases of [BuildConfig.UPDATE_REPO]:
- * check the latest release, download its APK, verify it, hand it to the system installer.
+ * Over-the-air updates from this app's folder on the rokid-conversate server
+ * ([BuildConfig.UPDATE_URL]: `/latest` = version JSON, `/download` = the APK, uploaded by
+ * scripts/release.sh): check, download, verify, hand it to the system installer.
+ *
+ * Installed once with `adb install -i <package>` (the app is its own installer), the update
+ * needs no confirmation on the glasses (USER_ACTION_NOT_REQUIRED, same as rokid-conversate) and
+ * [UpdateReceiver] starts the app again afterwards.
  *
  * Verification before installing: the file's SHA-256 must match the release, and the APK must
  * be this app (same package), newer, and signed with the same key as the installed app. The
@@ -50,8 +55,8 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
         if (!force && now - prefs.getLong(KEY_LAST_CHECK, 0) < CHECK_EVERY_MS) {
             return available?.let { Check.Available(it) } ?: Check.UpToDate
         }
-        val json = get("https://api.github.com/repos/${BuildConfig.UPDATE_REPO}/releases/latest") { code ->
-            // 404 = no release published yet.
+        val json = get("${BuildConfig.UPDATE_URL}/latest") { code ->
+            // 404 = nothing uploaded yet.
             if (code == 404) return Check.UpToDate.also { available = null }
         }
         prefs.edit().apply {
@@ -69,10 +74,10 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
         dir.mkdirs()
         val file = File(dir, "rokid-youtube-${release.versionName}.apk")
         val digest = MessageDigest.getInstance("SHA-256")
-        http().newCall(Request.Builder().url(release.apkUrl).build()).execute().use { response ->
+        http().newCall(Request.Builder().url("${BuildConfig.UPDATE_URL}/download").build()).execute().use { response ->
             if (!response.isSuccessful) throw UpdateException("받기 실패 (HTTP ${response.code})")
             val body = response.body
-            val total = body.contentLength().takeIf { it > 0 } ?: release.apkSize
+            val total = body.contentLength().takeIf { it > 0 } ?: release.size
             var done = 0L
             var lastPercent = -2
             body.byteStream().use { input ->
@@ -94,9 +99,7 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
                 }
             }
         }
-        val expected = release.sha256 ?: release.sha256Url?.let { url ->
-            Release.parseSha256File(get(url) {})
-        } ?: throw UpdateException("릴리스에 SHA-256이 없어요")
+        val expected = release.sha256
         val actual = digest.digest().joinToString("") { "%02x".format(it) }
         if (actual != expected) {
             file.delete()
@@ -159,7 +162,6 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
 
     private inline fun get(url: String, onError: (Int) -> Unit): String {
         val request = Request.Builder().url(url)
-            .header("Accept", "application/vnd.github+json")
             .header("User-Agent", "rokid-youtube-updater")
             .build()
         http().newCall(request).execute().use { response ->

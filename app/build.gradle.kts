@@ -16,16 +16,19 @@ fun secret(name: String, env: String): String =
     (localProps.getProperty(name) ?: providers.gradleProperty(name).orNull
         ?: providers.environmentVariable(env).orNull ?: "").trim().replace("\"", "")
 
-// App version "X.Y.Z" from -PappVersion (the release workflow passes the git tag without "v").
+// App version "X.Y.Z" from -PappVersion (scripts/release.sh passes it).
 // versionCode = X*10000 + Y*100 + Z, so every release installs over the previous one.
 val appVersion = providers.gradleProperty("appVersion").orNull?.removePrefix("v") ?: "0.1.0"
 val appVersionCode = appVersion.split(".").map { it.toInt() }.let { (x, y, z) -> x * 10000 + y * 100 + z }
 
-// Release signing key, from the environment (GitHub Actions secrets). Without it, release
-// builds fall back to the debug key so local builds keep working.
-val releaseKeystore = providers.environmentVariable("SIGNING_KEYSTORE").orNull
-val releaseKeystorePassword = providers.environmentVariable("SIGNING_KEYSTORE_PASSWORD").orNull
-val releaseKeyAlias = providers.environmentVariable("SIGNING_KEY_ALIAS").orNull
+// Release signing key: the same fixed key as rokid-conversate (kept outside the repository, see
+// scripts/release.sh). Without it, release builds fall back to the debug key for local use.
+val releaseKeystore = providers.gradleProperty("RELEASE_KEYSTORE").orNull
+val releaseKeystorePassword = providers.gradleProperty("RELEASE_KEYSTORE_PASS").orNull
+val releaseKeyAlias = providers.gradleProperty("RELEASE_KEY_ALIAS").orNull ?: "conversate"
+// OTA: this app's folder on the rokid-conversate server (see update/Updater.kt).
+val updateUrl = providers.gradleProperty("updateUrl").orNull
+    ?: "https://server-production-24bc.up.railway.app/apps/rokid-youtube"
 
 kotlin {
     jvmToolchain(21)
@@ -44,12 +47,12 @@ configure<ApplicationExtension> {
         versionName = appVersion
 
         buildConfigField("String", "GOOGLE_CLIENT_ID", "\"${secret("googleClientId", "GOOGLE_CLIENT_ID")}\"")
-        buildConfigField("String", "UPDATE_REPO", "\"ChoRockKim/rokid-youtube\"")
+        buildConfigField("String", "UPDATE_URL", "\"$updateUrl\"")
         buildConfigField("String", "GOOGLE_CLIENT_SECRET", "\"${secret("googleClientSecret", "GOOGLE_CLIENT_SECRET")}\"")
     }
 
     signingConfigs {
-        if (releaseKeystore != null) {
+        if (releaseKeystore != null && releaseKeystorePassword != null) {
             create("release") {
                 storeFile = file(releaseKeystore)
                 storePassword = releaseKeystorePassword

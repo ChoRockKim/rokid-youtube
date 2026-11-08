@@ -118,17 +118,15 @@ class UpdateScreen(
     }
 
     internal fun showAvailable(release: Release) {
-        val notes = release.notes.lines().map { it.trim().removePrefix("-").removePrefix("*").trim() }
-            .filter { it.isNotEmpty() && !it.startsWith("#") && !it.startsWith("**Full Changelog") }
-            .take(3).joinToString("\n")
         val current = updater?.currentVersionName ?: "0.1.0"
-        show("새 버전이 있어요", "v${release.versionName}", notes.ifEmpty { "지금 버전 v$current" })
+        val mb = if (release.size > 0) " · %.1fMB".format(release.size / 1_000_000.0) else ""
+        show("새 버전이 있어요", "v${release.versionName}", "지금 버전 v$current$mb")
         setButtons("받아서 설치" to { download(release) }, "나중에" to { navigator.back() })
     }
 
     private fun download(release: Release) {
         val u = updater ?: return
-        show("받는 중", "0%", "v${release.versionName} · ${release.apkSize / 1_000_000}MB")
+        show("받는 중", "0%", "v${release.versionName}")
         setButtons("취소" to {
             job?.cancel()
             showAvailable(release)
@@ -161,7 +159,7 @@ class UpdateScreen(
             return
         }
         installStarted = true
-        show("설치하는 중", "", "시스템 설치 화면이 뜨면 '업데이트'를 눌러 주세요\n설치가 끝나면 앱이 닫혀요. 다시 열어 주세요")
+        show("설치하는 중", "", "설치가 끝나면 앱이 다시 켜져요\n설치 확인 창이 뜨면 '업데이트'를 눌러 주세요")
         setButtons("닫기" to { navigator.back() })
         job = scope.launch {
             try {
@@ -177,7 +175,7 @@ class UpdateScreen(
     private fun onInstallResult(result: InstallResultReceiver.Result) {
         when (result) {
             InstallResultReceiver.Result.WaitingForUser -> Unit
-            InstallResultReceiver.Result.Installed -> show("설치 완료", "", "앱을 다시 열어 주세요")
+            InstallResultReceiver.Result.Installed -> show("설치 완료", "", "앱이 곧 다시 켜져요")
             is InstallResultReceiver.Result.Failed -> fail("설치 실패: ${result.message}")
         }
     }

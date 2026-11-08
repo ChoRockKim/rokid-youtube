@@ -84,7 +84,7 @@ Herald처럼 **구글 공식 로그인**(OAuth 기기 코드 방식)과 **YouTub
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-처음 한 번 설치한 뒤에는 위의 "업데이트 (OTA)"로 안경에서 바로 업데이트할 수 있습니다. 직접 빌드한 APK는 버전이 0.1.0으로 매겨지니, 릴리스와 같은 서명 키로 빌드해야 이후 OTA가 덮어 설치됩니다.
+디버그 APK는 디버그 키로 서명돼서 OTA 업데이트가 덮어 설치되지 않습니다. 안경에 계속 쓸 앱은 아래 "업데이트 (OTA)"의 `scripts/release.sh`로 만드세요.
 
 ## 테스트
 
@@ -102,13 +102,29 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## 업데이트 (OTA)
 
-안경에서 바로 새 버전을 받아 설치합니다. PC와 `adb`는 처음 한 번만 필요합니다.
+rokid-conversate 서버(Railway)의 OTA를 같이 씁니다. 이 앱의 APK는 `/data/ota/rokid-youtube/`에 따로 보관되고, 서명 키도 rokid-conversate와 같은 고정 키를 씁니다.
 
-- **앱에서:** 켤 때(6시간에 한 번) GitHub Releases의 최신 버전을 확인합니다. 새 버전이 있으면 띠 위 왼쪽에 초록색 "새 버전 vX.Y.Z"가 뜨고 홈 탭 줄 맨 끝 칩이 **[새 버전]**으로 바뀝니다. 칩을 누르고 **[받아서 설치]** → 시스템 설치 화면에서 **업데이트**. 처음 한 번은 "이 출처 허용"을 켜야 합니다. 설치가 끝나면 앱이 닫히니 다시 엽니다.
-- **설치 전 검사:** SHA-256이 릴리스와 같은지, 이 앱의 APK인지, 지금보다 새 버전인지, 서명 키가 설치된 앱과 같은지 확인합니다.
-- **릴리스 만들기:** `git tag v0.2.1 && git push origin v0.2.1` 하면 GitHub Actions(`.github/workflows/release.yml`)가 테스트 → 서명된 APK 빌드 → 릴리스 게시까지 합니다. 버전 코드는 태그에서 계산합니다(`X*10000 + Y*100 + Z`).
-- **필요한 저장소 Secrets** (Settings → Secrets and variables → Actions): `SIGNING_KEYSTORE_BASE64`, `SIGNING_KEYSTORE_PASSWORD`, `SIGNING_KEY_ALIAS`, 그리고 구글 로그인용 `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`. 서명 키가 없으면 워크플로가 릴리스를 만들지 않고 멈춥니다(다른 키로 서명된 APK는 덮어 설치가 안 되기 때문).
-- **서명 키는 꼭 따로 백업하세요.** 잃어버리면 지금 설치된 앱 위에 업데이트를 설치할 수 없고, 앱을 지웠다 다시 깔아야 합니다(로그인·시청 기록 삭제).
+**처음 한 번 (케이블로).** 지금 설치된 앱이 다른 키로 서명돼 있으면 먼저 지워야 합니다(로그인·시청 기록 삭제).
+```bash
+export RELEASE_KEYSTORE=~/.config/rokid-conversate/release.keystore   # rokid-conversate와 같은 키
+export RELEASE_KEYSTORE_PASS=...
+scripts/release.sh 0.2.0 --upload        # OTA_UPLOAD_TOKEN 필요 (Railway 변수)
+PKG=com.chorockkim.rokidyoutube
+adb uninstall $PKG                                     # 키가 바뀌는 처음 한 번만
+adb install -r -i $PKG build/rokid-youtube-0.2.0.apk   # -i: 이 앱이 자기 설치자 → 업데이트에 확인 창 없음
+adb shell appops set $PKG REQUEST_INSTALL_PACKAGES allow   # 업데이트 설치 허용
+adb shell appops set $PKG SYSTEM_ALERT_WINDOW allow        # 업데이트 뒤 앱 다시 띄우기
+```
+
+**그 다음부터.**
+```bash
+scripts/release.sh 0.2.1 --upload        # 버전은 매번 올린다 (versionCode = X*10000 + Y*100 + Z)
+```
+- 안경은 앱을 켤 때(6시간에 한 번) `GET /apps/rokid-youtube/latest`로 확인합니다. 새 버전이 있으면 띠 위 왼쪽에 초록 "새 버전 vX.Y.Z", 홈 탭 줄 맨 끝 칩이 **[새 버전]**이 됩니다. 칩 → **[받아서 설치]**.
+- 받은 뒤 SHA-256, 패키지 이름, 버전, 서명 키가 설치된 앱과 같은지 확인하고 설치합니다. 위처럼 처음에 `-i`로 설치했으면 확인 창 없이 설치되고 앱이 다시 켜집니다. 아니면 시스템 설치 확인 창이 뜹니다.
+- 서버: `GET /apps/rokid-youtube/latest`·`/download`는 토큰 없이 공개(이 APK에는 서버 토큰이 없음), `PUT /apps/rokid-youtube/upload`는 `OTA_UPLOAD_TOKEN`.
+- **릴리스 키를 잃어버리면 OTA로는 더 이상 업데이트할 수 없습니다** (지우고 케이블로 다시 설치).
+- 실기 미확인: 이 앱에서의 무확인 설치와 업데이트 뒤 자동 실행 (rokid-conversate에서는 확인됨).
 
 ## 앞으로 할 일
 
