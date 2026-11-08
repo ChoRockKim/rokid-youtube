@@ -45,12 +45,12 @@ class MainActivity : ComponentActivity(), Navigator {
     private val stack = ArrayDeque<Screen>()
     private val input = GlassesInput()
     private var recognizer: SpeechRecognizer? = null
-    private var pendingVoice: ((String) -> Unit)? = null
+    private var pendingVoice: com.chorockkim.rokidyoutube.ui.VoiceListener? = null
     private lateinit var offlineBanner: android.widget.TextView
     private lateinit var updateBanner: android.widget.TextView
     private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-        if (it) listen() else toast("마이크 권한이 필요해요")
+        if (it) listen() else pendingVoice?.onError("마이크 권한이 필요해요")
     }
 
     /**
@@ -287,12 +287,12 @@ class MainActivity : ComponentActivity(), Navigator {
 
     // region Voice search (Korean), same SpeechRecognizer flow as RokidPipe's SearchFragment
 
-    override fun startVoiceSearch(onResult: (String) -> Unit) {
+    override fun startVoiceSearch(listener: com.chorockkim.rokidyoutube.ui.VoiceListener) {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            toast("음성 인식을 쓸 수 없어요")
+            listener.onError("이 기기엔 음성 인식이 없어요 · 한글 키보드를 써 주세요")
             return
         }
-        pendingVoice = onResult
+        pendingVoice = listener
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
         ) {
@@ -303,29 +303,63 @@ class MainActivity : ComponentActivity(), Navigator {
     }
 
     private fun listen() {
-        val r = recognizer ?: SpeechRecognizer.createSpeechRecognizer(this).also { recognizer = it }
+        val listener = pendingVoice ?: return
+        val r = recognizer ?: runCatching { SpeechRecognizer.createSpeechRecognizer(this) }.getOrNull()
+            ?.also { recognizer = it }
+        if (r == null) {
+            listener.onError("음성 인식을 시작하지 못했어요")
+            return
+        }
         r.setRecognitionListener(object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) = listener.onListening("")
+
+            override fun onPartialResults(partialResults: Bundle?) {
+                val text = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                    ?.firstOrNull()?.trim()
+                if (!text.isNullOrEmpty()) listener.onListening(text)
+            }
+
             override fun onResults(results: Bundle) {
                 val text = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     ?.firstOrNull()?.trim()
-                if (text.isNullOrEmpty()) toast("못 알아들었어요") else pendingVoice?.invoke(text)
+                if (text.isNullOrEmpty()) listener.onError("못 알아들었어요 · 다시 해 주세요")
+                else listener.onResult(text)
             }
 
-            override fun onError(error: Int) = toast("음성 인식 실패 ($error)")
-            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onError(error: Int) {
+                // A recognizer stuck in "busy" / a client error does not recover: make a new one next time.
+                if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY || error == SpeechRecognizer.ERROR_CLIENT) {
+                    recognizer?.destroy()
+                    recognizer = null
+                }
+                listener.onError(voiceErrorText(error))
+            }
+
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
             override fun onEndOfSpeech() {}
-            override fun onPartialResults(partialResults: Bundle?) {}
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
         r.startListening(
             Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "ko-KR")
+                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "ko-KR")
+                .putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 .putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         )
+    }
+
+    private fun voiceErrorText(error: Int): String = when (error) {
+        SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "못 알아들었어요 · 다시 해 주세요"
+        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "마이크 권한이 필요해요"
+        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT,
+        SpeechRecognizer.ERROR_SERVER -> "음성 인식 서버에 못 붙었어요 · 인터넷 확인"
+        SpeechRecognizer.ERROR_AUDIO -> "마이크를 쓸 수 없어요"
+        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "음성 인식이 바빠요 · 다시 해 주세요"
+        12, 13 -> "한국어 음성 인식이 없어요 · 한글 키보드를 써 주세요" // LANGUAGE_NOT_SUPPORTED / UNAVAILABLE
+        else -> "음성 인식 실패 ($error) · 한글 키보드를 써 주세요"
     }
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()

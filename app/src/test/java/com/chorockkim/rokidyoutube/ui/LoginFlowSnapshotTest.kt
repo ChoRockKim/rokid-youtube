@@ -40,7 +40,7 @@ class LoginFlowSnapshotTest {
         override fun exitApp() {}
         override fun setKeepScreenOn(on: Boolean) {}
         override fun back() {}
-        override fun startVoiceSearch(onResult: (String) -> Unit) {}
+        override fun startVoiceSearch(listener: VoiceListener) {}
     }
 
     private val popular = listOf(

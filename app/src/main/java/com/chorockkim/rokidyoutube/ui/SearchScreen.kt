@@ -54,14 +54,37 @@ class SearchScreen(
         keyboard.onTextChanged = ::renderQuery
         keyboard.onSearch = ::search
         keyboard.onVoice = {
-            queryBar.hint = "말씀하세요…"
-            navigator.startVoiceSearch { spoken ->
-                keyboard.setText(spoken)
-                search(spoken)
-            }
+            setVoiceHint("마이크 켜는 중…")
+            navigator.startVoiceSearch(object : VoiceListener {
+                override fun onListening(text: String) {
+                    if (text.isEmpty()) setVoiceHint("🎤 말씀하세요…") else queryBar.text = "🎤 $text"
+                }
+
+                override fun onResult(text: String) {
+                    keyboard.setText(text)
+                    search(text)
+                }
+
+                override fun onError(message: String) {
+                    renderQuery(keyboard.text)
+                    if (keyboard.text.isEmpty()) queryBar.hint = message
+                    else setStatusHintBriefly(message)
+                }
+            })
         }
         renderQuery("")
         showKeyboard()
+    }
+
+    private fun setVoiceHint(text: String) {
+        queryBar.text = ""
+        queryBar.hint = text
+    }
+
+    /** A voice error while there is typed text: show it in the bar for a moment. */
+    private fun setStatusHintBriefly(message: String) {
+        queryBar.text = message
+        queryBar.postDelayed({ renderQuery(keyboard.text) }, 2_000)
     }
 
     private fun renderQuery(text: String) {
@@ -70,7 +93,7 @@ class SearchScreen(
             typing -> "$text▏"
             else -> text
         }
-        if (text.isEmpty()) queryBar.hint = "검색어 입력 · 한국어는 음성 키"
+        if (text.isEmpty()) queryBar.hint = "검색어 입력 · 음성 키로 말해도 돼요"
         queryBar.setHintTextColor(Hud.GREY)
     }
 

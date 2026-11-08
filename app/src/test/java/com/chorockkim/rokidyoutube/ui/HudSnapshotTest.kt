@@ -49,7 +49,7 @@ class HudSnapshotTest {
         override fun exitApp() {}
         override fun setKeepScreenOn(on: Boolean) {}
         override fun back() {}
-        override fun startVoiceSearch(onResult: (String) -> Unit) {}
+        override fun startVoiceSearch(listener: VoiceListener) {}
     }
 
     private val sampleVideos = listOf(
@@ -95,8 +95,19 @@ class HudSnapshotTest {
     @Test
     fun search_keyboard() {
         val search = SearchScreen(context, navigator, scope) { sampleVideos }
+        search.keyboard.showPage(GlassesKeyboard.Page.LETTERS)
         "rick ast".forEach { c -> search.keyboard.setText(search.keyboard.text + c) }
         search.keyboard.selected = 11 // "l"
+        snapshot(search.view)
+    }
+
+    @Test
+    fun search_koreanKeyboard() {
+        val search = SearchScreen(context, navigator, scope) { sampleVideos }
+        "ㅂㅐㄱㅈㅗㅇㅇㅜㅓㄴ ㄱㅣㅁㅊㅣ".forEach { c ->
+            search.keyboard.setText(if (c == ' ') search.keyboard.text + " " else Hangul.append(search.keyboard.text, c.toString()))
+        }
+        search.keyboard.selected = 23 // ㅓ
         snapshot(search.view)
     }
 

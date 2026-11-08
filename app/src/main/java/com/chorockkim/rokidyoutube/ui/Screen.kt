@@ -18,6 +18,15 @@ interface Screen {
     fun dp(value: Number): Int = view.context.dp(value)
 }
 
+/** Korean speech recognition progress for the search screen. */
+interface VoiceListener {
+    /** Listening; [text] = what was heard so far (empty at first). */
+    fun onListening(text: String)
+    fun onResult(text: String)
+    /** Failed, with a message for the user. */
+    fun onError(message: String)
+}
+
 /** What screens can ask the host activity to do. */
 interface Navigator {
     fun openSearch()
@@ -29,5 +38,5 @@ interface Navigator {
     fun exitApp()
     /** Screen on (default) or allowed to time out, e.g. while the video is paused. */
     fun setKeepScreenOn(on: Boolean)
-    fun startVoiceSearch(onResult: (String) -> Unit)
+    fun startVoiceSearch(listener: VoiceListener)
 }
