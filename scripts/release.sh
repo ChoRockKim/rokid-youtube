@@ -12,7 +12,7 @@
 #   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET   Google sign-in (or googleClientId / googleClientSecret
 #                           in local.properties); without them the account tabs can't sign in
 #   OTA_UPLOAD_TOKEN        for --upload (Railway variable of the rokid-conversate server)
-#   UPDATE_URL              default https://server-production-24bc.up.railway.app/apps/rokid-youtube
+#   UPDATE_URL              default https://server-v2-production-8f97.up.railway.app/apps/rokid-youtube
 #
 # Losing the keystore means the glasses can no longer be updated over the air
 # (uninstall and install again over adb).
@@ -20,7 +20,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 NAME="${1:?versionName X.Y.Z, larger than the installed one}"
 UPLOAD="${2:-}"
-URL="${UPDATE_URL:-https://server-production-24bc.up.railway.app/apps/rokid-youtube}"
+URL="${UPDATE_URL:-https://server-v2-production-8f97.up.railway.app/apps/rokid-youtube}"
 KS="${RELEASE_KEYSTORE:?RELEASE_KEYSTORE (path) required}"
 PASS="${RELEASE_KEYSTORE_PASS:?RELEASE_KEYSTORE_PASS required}"
 [ -s "$KS" ] || { echo "keystore not found: $KS"; exit 1; }

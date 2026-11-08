@@ -28,7 +28,7 @@ val releaseKeystorePassword = providers.gradleProperty("RELEASE_KEYSTORE_PASS").
 val releaseKeyAlias = providers.gradleProperty("RELEASE_KEY_ALIAS").orNull ?: "conversate"
 // OTA: this app's folder on the rokid-conversate server (see update/Updater.kt).
 val updateUrl = providers.gradleProperty("updateUrl").orNull
-    ?: "https://server-production-24bc.up.railway.app/apps/rokid-youtube"
+    ?: "https://server-v2-production-8f97.up.railway.app/apps/rokid-youtube"
 
 kotlin {
     jvmToolchain(21)
