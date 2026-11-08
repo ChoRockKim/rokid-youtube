@@ -2,6 +2,7 @@ package com.chorockkim.rokidyoutube.data
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecommendationsTest {
@@ -25,8 +26,11 @@ class RecommendationsTest {
         "L2" to listOf(video("l2a"), video("L1")) // a liked video itself is excluded
     )
 
-    private fun recommendations(history: WatchHistory, account: Recommendations.Account?) =
-        Recommendations(history, account, { now }) { url -> related[url.substringAfterLast('/')].orEmpty() }
+    private fun recommendations(
+        history: WatchHistory,
+        account: Recommendations.Account?,
+        random: kotlin.random.Random? = null
+    ) = Recommendations(history, account, { now }, random) { url -> related[url.substringAfterLast('/')].orEmpty() }
 
     @Test
     fun mixesHistoryLikedAndSubscriptionsRoundRobin() = runBlocking {
@@ -60,5 +64,31 @@ class RecommendationsTest {
         recs.invalidate()
         recs.feed()
         assertEquals(3, likedCalls)
+    }
+
+    @Test
+    fun aReloadStartsWithOtherVideosButKeepsThemAll() = runBlocking {
+        val history = WatchHistory(null) { now }
+        // Plenty of material: 3 watched videos with 8 related each.
+        for (w in 1..3) history.recordWatch(video("w$w"), (1..8).map { video("w${w}r$it") })
+        val recs = recommendations(history, account(signedIn = false), kotlin.random.Random(7))
+
+        val first = recs.feed()
+        val second = recs.feed()
+
+        assertEquals(first.map { it.url }.toSet(), second.map { it.url }.toSet())
+        // Last time's top 6 are not on the first screen any more.
+        val topBefore = first.take(Recommendations.TOP).map { it.url }.toSet()
+        assertTrue(second.take(Recommendations.TOP).none { it.url in topBefore })
+    }
+
+    @Test
+    fun shufflingChangesTheOrder() = runBlocking {
+        val history = WatchHistory(null) { now }
+        for (w in 1..3) history.recordWatch(video("w$w"), (1..8).map { video("w${w}r$it") })
+        val plain = recommendations(history, null).feed().map { it.url }
+        val shuffled = recommendations(history, null, kotlin.random.Random(1)).feed().map { it.url }
+        assertEquals(plain.toSet(), shuffled.toSet())
+        assertTrue(plain != shuffled)
     }
 }

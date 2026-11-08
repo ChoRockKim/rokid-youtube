@@ -34,12 +34,12 @@ import org.schabi.newpipe.extractor.stream.StreamInfo
 
 /**
  * Player filling the HUD band. Controls (one row of buttons + progress) appear only on a tap and
- * hide after a few seconds. Hidden: swipe = seek ±10s (small time pill, no controls), tap = show
- * controls, back = close.
+ * hide after a few seconds. Hidden: swipe = volume ±5% (small pill, no controls), tap = show
+ * controls, back = close. Seeking ±10s is in the controls.
  * Shown: swipe walks the buttons, tap presses, back hides the controls.
- * [크기] / [가림] / [볼륨] open an adjust panel: front/back swipes change the video size (10%
- * steps, 20-100%), the privacy filter (see [PrivacyFilter]) or the volume (5% steps, see
- * [FineVolume]); tap or back closes it. The volume keys
+ * [크기] / [가림] open an adjust panel: front/back swipes change the video size (10% steps,
+ * 20-100%) or the privacy filter (see [PrivacyFilter]); tap or back closes it. Volume moves in
+ * 5% steps (see [FineVolume]) with swipes while the controls are hidden, and with volume keys. The volume keys
  * also change the volume in 5% steps, and DPAD up/down (if the device sends them) the size.
  */
 class PlayerScreen(
@@ -66,7 +66,7 @@ class PlayerScreen(
     private val textureView = TextureView(context)
     private val status = Hud.text(context, 15f, Hud.GREY).apply { gravity = Gravity.CENTER }
 
-    /** Small "+10초 · 2:13 / 3:33" pill after a swipe-seek, instead of opening the controls. */
+    /** Small pill at the bottom ("볼륨 45%") after a swipe, instead of opening the controls. */
     private val seekToast = Hud.text(context, 12f, bold = true).apply {
         setPadding(dp(10), dp(3), dp(10), dp(3))
         background = GradientDrawable().apply {
@@ -85,7 +85,7 @@ class PlayerScreen(
     private val volume: FineVolume? = if (playerFactory != null) FineVolume(context) else null
 
     /** What front/back swipes change while an adjust panel is open. */
-    private enum class Adjust { NONE, SIZE, PRIVACY, VOLUME }
+    private enum class Adjust { NONE, SIZE, PRIVACY }
     private var adjust = Adjust.NONE
 
     // Centered adjust panel: "화면 크기" / "80%" / hint.
@@ -134,9 +134,10 @@ class PlayerScreen(
     private val qualityButton = Hud.button(context, "480p", 12f)
     private val rail: List<Pair<TextView, () -> Unit>> = listOf(
         playPause to ::togglePlay,
+        Hud.button(context, "-10초", 12f) to { seekBy(-10_000) },
+        Hud.button(context, "+10초", 12f) to { seekBy(10_000) },
         Hud.button(context, "크기", 12f) to { startAdjust(Adjust.SIZE) },
         Hud.button(context, "가림", 12f) to { startAdjust(Adjust.PRIVACY) },
-        Hud.button(context, "볼륨", 12f) to { startAdjust(Adjust.VOLUME) },
         qualityButton to ::nextQuality,
         Hud.button(context, "닫기", 12f) to { navigator.back() },
         // Red so it is not mistaken for 닫기 (which only closes the player).
@@ -328,13 +329,8 @@ class PlayerScreen(
         updateProgress()
     }
 
-    private fun showSeekToast(label: String) {
-        val p = player
-        seekToast.text = if (p == null) label else {
-            val pos = Hud.formatDuration(p.currentPosition / 1000).ifEmpty { "0:00" }
-            val dur = Hud.formatDuration(p.duration.coerceAtLeast(0) / 1000)
-            if (dur.isEmpty()) "$label · $pos" else "$label · $pos / $dur"
-        }
+    private fun showVolumeToast() {
+        seekToast.text = "볼륨 ${volume?.percent ?: 100}%"
         seekToast.visibility = View.VISIBLE
         handler.removeCallbacks(hideSeekToast)
         handler.postDelayed(hideSeekToast, 1_000)
@@ -406,13 +402,11 @@ class PlayerScreen(
     private fun renderAdjust(mode: Adjust, hint: Boolean) {
         adjustTitle.text = when (mode) {
             Adjust.SIZE -> "화면 크기"
-            Adjust.PRIVACY -> "가림 (앞사람에게 덜 보이게)"
-            else -> "볼륨"
+            else -> "가림 (앞사람에게 덜 보이게)"
         }
         adjustValue.text = when (mode) {
             Adjust.SIZE -> "$sizePercent%"
-            Adjust.PRIVACY -> if (privacyLevel == 0) "끔" else "$privacyLevel / ${PrivacyFilter.MAX_LEVEL}"
-            else -> "${volume?.percent ?: 100}%"
+            else -> if (privacyLevel == 0) "끔" else "$privacyLevel / ${PrivacyFilter.MAX_LEVEL}"
         }
         adjustHint.text = "앞뒤로 쓸어서 조절\n탭하면 완료"
         adjustHint.visibility = if (hint) View.VISIBLE else View.GONE
@@ -479,7 +473,7 @@ class PlayerScreen(
     override fun onAction(action: Action): Boolean {
         if (action == Action.VOLUME_UP || action == Action.VOLUME_DOWN) {
             changeVolume(if (action == Action.VOLUME_UP) 1 else -1)
-            renderAdjust(Adjust.VOLUME, hint = adjust == Adjust.VOLUME)
+            showVolumeToast()
             return true
         }
         if (adjust != Adjust.NONE) {
@@ -488,8 +482,7 @@ class PlayerScreen(
                     val up = action == Action.NEXT || action == Action.UP
                     when (adjust) {
                         Adjust.SIZE -> resizeBy(if (up) SIZE_STEP else -SIZE_STEP)
-                        Adjust.PRIVACY -> changePrivacy(if (up) 1 else -1)
-                        else -> changeVolume(if (up) 1 else -1)
+                        else -> changePrivacy(if (up) 1 else -1)
                     }
                     renderAdjust(adjust, hint = true)
                 }
@@ -505,8 +498,9 @@ class PlayerScreen(
                     moveRail(railCursor + if (action == Action.NEXT) 1 else -1)
                     scheduleHide()
                 } else {
-                    seekBy(if (action == Action.NEXT) 10_000 else -10_000)
-                    showSeekToast(if (action == Action.NEXT) "+10초" else "-10초")
+                    // Swipe = volume (front = louder); seeking is in the menu.
+                    changeVolume(if (action == Action.NEXT) 1 else -1)
+                    showVolumeToast()
                 }
                 true
             }
