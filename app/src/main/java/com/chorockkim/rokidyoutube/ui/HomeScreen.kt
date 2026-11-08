@@ -162,7 +162,11 @@ class HomeScreen(
 
     override fun onAction(action: Action): Boolean = when (action) {
         Action.NEXT -> { moveTo(cursor + 1); true }
-        Action.PREVIOUS -> { moveTo(cursor - 1); true }
+        Action.PREVIOUS -> {
+            // From [검색] (the very first item) a back swipe jumps straight to the first video.
+            if (cursor == 0 && list.items.isNotEmpty()) moveTo(chips.size) else moveTo(cursor - 1)
+            true
+        }
         Action.SELECT -> {
             if (cursor < chips.size) {
                 chipActions[cursor]()

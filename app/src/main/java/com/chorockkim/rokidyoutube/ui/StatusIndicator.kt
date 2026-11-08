@@ -24,6 +24,7 @@ import java.util.Locale
  */
 class StatusIndicator(context: Context) : LinearLayout(context) {
     private val clock = Hud.text(context, 12f, Hud.WHITE, bold = true)
+    private val bolt = BoltIcon(context).apply { visibility = GONE }
     private val battery = BatteryIcon(context)
     private val percent = Hud.text(context, 12f, Hud.GREY)
     private val format = SimpleDateFormat("HH:mm", Locale.KOREA)
@@ -39,7 +40,8 @@ class StatusIndicator(context: Context) : LinearLayout(context) {
         gravity = Gravity.CENTER_VERTICAL
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         addView(clock)
-        addView(battery, LayoutParams(dp(20), dp(10)).apply { marginStart = dp(10) })
+        addView(bolt, LayoutParams(dp(7), dp(11)).apply { marginStart = dp(10) })
+        addView(battery, LayoutParams(dp(20), dp(10)).apply { marginStart = dp(3) })
         addView(percent, LayoutParams(-2, -2).apply { marginStart = dp(4) })
     }
 
@@ -88,8 +90,36 @@ class StatusIndicator(context: Context) : LinearLayout(context) {
         percent.text = "$batteryPercent%"
         battery.level = batteryPercent
         battery.charging = charging
-        percent.setTextColor(if (batteryPercent <= LOW && !charging) Hud.RED else Hud.GREY)
+        percent.setTextColor(
+            when {
+                charging -> Hud.GREEN
+                batteryPercent <= LOW -> Hud.RED
+                else -> Hud.GREY
+            }
+        )
+        bolt.visibility = if (charging) VISIBLE else GONE
+        (battery.layoutParams as LayoutParams).marginStart = dp(if (charging) 3 else 10)
         battery.invalidate()
+    }
+
+    /** Small lightning bolt shown while charging (drawn, not an emoji: emoji render in color). */
+    private class BoltIcon(context: Context) : View(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Hud.GREEN }
+        private val path = android.graphics.Path()
+
+        override fun onDraw(canvas: Canvas) {
+            val w = width.toFloat()
+            val h = height.toFloat()
+            path.reset()
+            path.moveTo(w * 0.62f, 0f)
+            path.lineTo(0f, h * 0.58f)
+            path.lineTo(w * 0.45f, h * 0.58f)
+            path.lineTo(w * 0.32f, h)
+            path.lineTo(w, h * 0.40f)
+            path.lineTo(w * 0.55f, h * 0.40f)
+            path.close()
+            canvas.drawPath(path, paint)
+        }
     }
 
     private class BatteryIcon(context: Context) : View(context) {

@@ -342,13 +342,10 @@ class PlayerScreen(
         seekToast.visibility = View.VISIBLE
     }
 
-    /** Steps down through the available heights and wraps to the highest one. */
+    /** Steps up through the available heights and wraps to the lowest one. */
     private fun nextQuality() {
         val streamInfo = info ?: return
-        if (availableHeights.size < 2) return
-        val current = availableHeights.firstOrNull { it <= maxHeight } ?: availableHeights.last()
-        val index = availableHeights.indexOf(current)
-        maxHeight = availableHeights[(index + 1) % availableHeights.size]
+        maxHeight = StreamSelector.nextHeightUp(availableHeights, maxHeight) ?: return
         play(streamInfo, startAtMs = player?.currentPosition ?: 0L)
     }
 

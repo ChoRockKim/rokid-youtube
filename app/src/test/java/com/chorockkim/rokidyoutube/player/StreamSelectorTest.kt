@@ -78,4 +78,16 @@ class StreamSelectorTest {
         )
         assertSame(original, selection.audio)
     }
+
+    @Test
+    fun qualityButtonGoesUpThenWrapsToTheLowest() {
+        val heights = listOf(1080, 720, 480, 360, 144)
+        assertEquals(720, StreamSelector.nextHeightUp(heights, 480))
+        assertEquals(1080, StreamSelector.nextHeightUp(heights, 720))
+        assertEquals(144, StreamSelector.nextHeightUp(heights, 1080))
+        assertEquals(360, StreamSelector.nextHeightUp(heights, 144))
+        // A limit between steps plays the next lower one (480 for 600), so up is 720.
+        assertEquals(720, StreamSelector.nextHeightUp(heights, 600))
+        assertEquals(null, StreamSelector.nextHeightUp(listOf(360), 480))
+    }
 }

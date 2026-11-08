@@ -85,6 +85,22 @@ class HudSnapshotTest {
     }
 
     @Test
+    fun home_backFromSearchJumpsToFirstVideo() {
+        val home = HomeScreen(context, navigator, scope, tabs(sampleVideos)) { "계정" }
+        home.list.thumbnailBinder = ::fakeThumbnail
+        home.onAction(GlassesInput.Action.PREVIOUS) // cursor starts on [검색]
+        org.junit.Assert.assertEquals(0, home.list.selected)
+        snapshot(home.view)
+    }
+
+    @Test
+    fun home_charging() {
+        val home = HomeScreen(context, navigator, scope, tabs(sampleVideos)) { "계정" }
+        home.list.thumbnailBinder = ::fakeThumbnail
+        snapshot(home.view, charging = true)
+    }
+
+    @Test
     fun home_offline() {
         val home = HomeScreen(context, navigator, scope, tabs(sampleVideos)) { "계정" }
         home.list.thumbnailBinder = ::fakeThumbnail
@@ -236,7 +252,7 @@ class HudSnapshotTest {
     }
 
     /** Full 480x640 glasses display; black above the band is transparent on the glasses. */
-    private fun snapshot(band: View, offline: Boolean = false, update: String? = null) {
+    private fun snapshot(band: View, offline: Boolean = false, update: String? = null, charging: Boolean = false) {
         val root = FrameLayout(context).apply { setBackgroundColor(Color.BLACK) }
         root.addView(
             band,
@@ -250,7 +266,7 @@ class HudSnapshotTest {
             root.addView(Hud.updateNotice(context).apply { text = "새 버전 v$update" }, Hud.updateNoticeParams(context))
         }
         root.addView(
-            StatusIndicator(context).apply { show(82, charging = false, time = "14:32") },
+            StatusIndicator(context).apply { show(82, charging = charging, time = "14:32") },
             StatusIndicator.params(context)
         )
         paparazzi.snapshot(root)

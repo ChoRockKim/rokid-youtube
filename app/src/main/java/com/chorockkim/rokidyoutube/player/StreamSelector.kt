@@ -41,6 +41,17 @@ object StreamSelector {
                 (!isYoutube || stream.itagItem == null || stream.itagItem!!.id in SUPPORTED_ITAG_IDS)
         }
 
+    /**
+     * The [화질] button: one step up from the height playing now ([maxHeight] picks it), and from
+     * the highest back to the lowest. [heights] is highest first, as in [Selection].
+     */
+    fun nextHeightUp(heights: List<Int>, maxHeight: Int): Int? {
+        if (heights.size < 2) return null
+        val current = heights.firstOrNull { it <= maxHeight } ?: heights.last()
+        val index = heights.indexOf(current)
+        return if (index == 0) heights.last() else heights[index - 1]
+    }
+
     fun heightOf(stream: VideoStream): Int =
         stream.height.takeIf { it > 0 }
             ?: Regex("(\\d+)p").find(stream.getResolution())?.groupValues?.get(1)?.toIntOrNull()
