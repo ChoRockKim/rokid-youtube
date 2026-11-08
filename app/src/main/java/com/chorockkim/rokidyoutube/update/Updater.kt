@@ -39,6 +39,7 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
     }
 
     class UpdateException(message: String) : IOException(message)
+    private class NothingUploaded : IOException("nothing uploaded")
 
     private val prefs = context.getSharedPreferences("update", Context.MODE_PRIVATE)
     private val dir get() = File(context.cacheDir, "updates")
@@ -55,9 +56,14 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
         if (!force && now - prefs.getLong(KEY_LAST_CHECK, 0) < CHECK_EVERY_MS) {
             return available?.let { Check.Available(it) } ?: Check.UpToDate
         }
-        val json = get("${BuildConfig.UPDATE_URL}/latest") { code ->
+        // Off the main thread: Android refuses network calls there (NetworkOnMainThreadException),
+        // which made every check fail before.
+        val json = withContext(Dispatchers.IO) {
+            runCatching { get("${BuildConfig.UPDATE_URL}/latest") { code -> if (code == 404) throw NothingUploaded() } }
+        }.getOrElse { e ->
             // 404 = nothing uploaded yet.
-            if (code == 404) return Check.UpToDate.also { available = null }
+            if (e is NothingUploaded) return Check.UpToDate.also { available = null }
+            throw e
         }
         prefs.edit().apply {
             putLong(KEY_LAST_CHECK, now)

@@ -112,7 +112,7 @@ class UpdateScreen(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                fail(e.message ?: "업데이트를 확인하지 못했어요")
+                fail(e.message ?: "업데이트를 확인하지 못했어요 (${e.javaClass.simpleName})")
             }
         }
     }
