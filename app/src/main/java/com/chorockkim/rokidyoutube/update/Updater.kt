@@ -6,9 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import com.chorockkim.rokidyoutube.BuildConfig
 import java.io.File
 import java.io.IOException
@@ -132,14 +130,6 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
 
     /** Whether the system lets this app install APKs (the "unknown sources" toggle for this app). */
     fun canInstall(): Boolean = context.packageManager.canRequestPackageInstalls()
-
-    /** Opens the system screen where the user allows installs from this app. */
-    fun openInstallPermissionSettings() {
-        context.startActivity(
-            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
-    }
 
     /**
      * Starts a system install session. The system shows its own confirmation; the result arrives

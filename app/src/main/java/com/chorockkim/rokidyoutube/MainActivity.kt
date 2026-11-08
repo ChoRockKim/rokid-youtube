@@ -196,10 +196,6 @@ class MainActivity : ComponentActivity(), Navigator {
         push(PlayerScreen(this, this, lifecycleScope, video, app.history))
     }
 
-    override fun openUpdate() {
-        push(com.chorockkim.rokidyoutube.ui.UpdateScreen(this, this, lifecycleScope, app.updater, ::showUpdate))
-    }
-
     /**
      * At every app start: ask the server for a newer version and, if there is one, download,
      * verify and install it right away (like rokid-conversate). Installed once with
@@ -214,7 +210,7 @@ class MainActivity : ComponentActivity(), Navigator {
             showUpdate(release)
             if (release == null) return@launch
             if (!updater.canInstall()) {
-                // Needs "install unknown apps" once: [새 버전] chip -> update screen -> 설정 열기.
+                // Needs "install unknown apps" once (adb: appops set <pkg> REQUEST_INSTALL_PACKAGES allow).
                 updateBanner.text = "새 버전 v${release.versionName} · 설치 허용 필요"
                 return@launch
             }
@@ -246,7 +242,6 @@ class MainActivity : ComponentActivity(), Navigator {
     }
 
     private fun showUpdate(release: com.chorockkim.rokidyoutube.update.Release?) {
-        home.setUpdateAvailable(release?.versionName)
         updateBanner.text = release?.let { "새 버전 v${it.versionName}" }
         updateBanner.visibility = if (release == null) android.view.View.GONE else android.view.View.VISIBLE
     }

@@ -122,7 +122,7 @@ adb shell appops set $PKG SYSTEM_ALERT_WINDOW allow        # 업데이트 뒤 �
 ```bash
 scripts/release.sh 0.2.1 --upload        # 버전은 매번 올린다 (versionCode = X*10000 + Y*100 + Z)
 ```
-- 안경은 **앱을 켤 때마다** `GET /apps/rokid-youtube/latest`로 확인하고, 새 버전이 있으면 **알아서 받아서 설치**합니다. 진행 상황은 띠 위 왼쪽 초록 표시("업데이트 v0.2.2 받는 중 45%"). 홈 탭 줄 맨 끝 **[업데이트]** 칩으로 직접 확인할 수도 있습니다.
+- 안경은 **앱을 켤 때마다** `GET /apps/rokid-youtube/latest`로 확인하고, 새 버전이 있으면 **알아서 받아서 설치**합니다. 진행 상황은 띠 위 왼쪽 초록 표시("업데이트 v0.2.2 받는 중 45%"). 따로 누를 버튼은 없습니다. 설치 허용(`REQUEST_INSTALL_PACKAGES` appops)이 없으면 "설치 허용 필요"라고만 표시합니다.
 - 받은 뒤 SHA-256, 패키지 이름, 버전, 서명 키가 설치된 앱과 같은지 확인하고 설치합니다. 위처럼 처음에 `-i`로 설치했으면 확인 창 없이 설치되고 앱이 다시 켜집니다. 아니면 시스템 설치 확인 창이 뜹니다.
 - 서버: `GET /apps/rokid-youtube/latest`·`/download`는 토큰 없이 공개(이 APK에는 서버 토큰이 없음), `PUT /apps/rokid-youtube/upload`는 `OTA_UPLOAD_TOKEN`.
 - **릴리스 키를 잃어버리면 OTA로는 더 이상 업데이트할 수 없습니다** (지우고 케이블로 다시 설치).

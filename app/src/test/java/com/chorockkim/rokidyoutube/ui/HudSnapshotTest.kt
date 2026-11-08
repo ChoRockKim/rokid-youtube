@@ -45,7 +45,6 @@ class HudSnapshotTest {
         override fun openSearch() {}
         override fun openPlayer(video: VideoItem) {}
         override fun openAccount() {}
-        override fun openUpdate() {}
         override fun exitApp() {}
         override fun setKeepScreenOn(on: Boolean) {}
         override fun back() {}
@@ -224,24 +223,6 @@ class HudSnapshotTest {
             grid.addView(cell)
         }
         snapshot(grid)
-    }
-
-    @Test
-    fun update_available() {
-        val screen = UpdateScreen(context, navigator, scope, updater = null)
-        screen.showAvailable(
-            com.chorockkim.rokidyoutube.update.Release("0.2.1", 201, 7_481_342, "ab".repeat(32))
-        )
-        snapshot(screen.view, update = "0.2.1")
-    }
-
-    @Test
-    fun home_updateAvailable() {
-        val home = HomeScreen(context, navigator, scope, tabs(sampleVideos)) { "계정" }
-        home.list.thumbnailBinder = ::fakeThumbnail
-        home.setUpdateAvailable("0.2.1")
-        repeat(6) { home.onAction(GlassesInput.Action.NEXT) } // last chip
-        snapshot(home.view, update = "0.2.1")
     }
 
     @Test

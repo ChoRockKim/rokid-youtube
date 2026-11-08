@@ -36,7 +36,6 @@ class LoginFlowSnapshotTest {
         override fun openSearch() {}
         override fun openPlayer(video: VideoItem) {}
         override fun openAccount() {}
-        override fun openUpdate() {}
         override fun exitApp() {}
         override fun setKeepScreenOn(on: Boolean) {}
         override fun back() {}

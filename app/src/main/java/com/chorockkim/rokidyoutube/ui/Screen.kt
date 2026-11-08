@@ -32,7 +32,6 @@ interface Navigator {
     fun openSearch()
     fun openPlayer(video: com.chorockkim.rokidyoutube.data.VideoItem)
     fun openAccount()
-    fun openUpdate()
     fun back()
     /** Closes the whole app (not just this screen) and removes it from recents. */
     fun exitApp()
