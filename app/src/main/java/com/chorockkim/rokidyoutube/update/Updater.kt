@@ -49,7 +49,7 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
     var available: Release? = null
         private set
 
-    /** Checks at most every [CHECK_EVERY_MS] unless [force]. */
+    /** Checks at most every [CHECK_EVERY_MS] unless [force] (the app forces it at every start). */
     suspend fun check(force: Boolean = false): Check {
         val now = System.currentTimeMillis()
         if (!force && now - prefs.getLong(KEY_LAST_CHECK, 0) < CHECK_EVERY_MS) {

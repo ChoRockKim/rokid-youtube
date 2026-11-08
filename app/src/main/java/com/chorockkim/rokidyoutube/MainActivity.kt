@@ -200,11 +200,47 @@ class MainActivity : ComponentActivity(), Navigator {
         push(com.chorockkim.rokidyoutube.ui.UpdateScreen(this, this, lifecycleScope, app.updater, ::showUpdate))
     }
 
-    /** Quiet check at start (at most every few hours); a new release shows the green pill + chip. */
+    /**
+     * At every app start: ask the server for a newer version and, if there is one, download,
+     * verify and install it right away (like rokid-conversate). Installed once with
+     * `adb install -i`, Android asks nothing and the app starts again by itself; otherwise the
+     * system shows its install confirmation. Progress shows in the green pill above the band.
+     */
     private fun checkForUpdate() {
+        val updater = app.updater
         lifecycleScope.launch {
-            runCatching { app.updater.check() }.getOrNull()?.let { result ->
-                showUpdate((result as? com.chorockkim.rokidyoutube.update.Updater.Check.Available)?.release)
+            val release = (runCatching { updater.check(force = true) }.getOrNull()
+                as? com.chorockkim.rokidyoutube.update.Updater.Check.Available)?.release
+            showUpdate(release)
+            if (release == null) return@launch
+            if (!updater.canInstall()) {
+                // Needs "install unknown apps" once: [새 버전] chip -> update screen -> 설정 열기.
+                updateBanner.text = "새 버전 v${release.versionName} · 설치 허용 필요"
+                return@launch
+            }
+            updateBanner.text = "업데이트 v${release.versionName} 받는 중"
+            val apk = runCatching {
+                updater.download(release) { percent ->
+                    if (percent >= 0) updateBanner.text = "업데이트 v${release.versionName} 받는 중 $percent%"
+                }
+            }.getOrElse {
+                updateBanner.text = "업데이트 실패 · ${it.message ?: "다시 켜면 다시 해요"}"
+                return@launch
+            }
+            com.chorockkim.rokidyoutube.update.InstallResultReceiver.listener = { result ->
+                runOnUiThread {
+                    updateBanner.text = when (result) {
+                        is com.chorockkim.rokidyoutube.update.InstallResultReceiver.Result.Failed ->
+                            "업데이트 실패 · ${result.message}"
+                        com.chorockkim.rokidyoutube.update.InstallResultReceiver.Result.WaitingForUser ->
+                            "업데이트 v${release.versionName} · 설치 확인을 눌러 주세요"
+                        else -> "업데이트 v${release.versionName} 설치 완료 · 다시 켜는 중"
+                    }
+                }
+            }
+            updateBanner.text = "업데이트 v${release.versionName} 설치 중 · 곧 다시 켜져요"
+            runCatching { updater.install(apk) }.onFailure {
+                updateBanner.text = "업데이트 실패 · ${it.message ?: it.javaClass.simpleName}"
             }
         }
     }
