@@ -42,6 +42,7 @@ class RokidYouTubeApp : Application(), SingletonImageLoader.Factory {
         )
     }
     val accountApi by lazy { YouTubeAccountApi(OkHttpDownloader.get().client) { auth.accessToken() } }
+    val updater by lazy { com.chorockkim.rokidyoutube.update.Updater(this) { OkHttpDownloader.get().client } }
     val history by lazy { WatchHistory(File(filesDir, "watch_history.json")) }
     val recommendations by lazy {
         Recommendations(history, object : Recommendations.Account {

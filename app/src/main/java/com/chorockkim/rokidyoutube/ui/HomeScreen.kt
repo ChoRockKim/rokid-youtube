@@ -49,6 +49,7 @@ class HomeScreen(
     private val chips = mutableListOf<TextView>()
     private val chipActions = mutableListOf<() -> Unit>()
     private val accountChip: TextView
+    private val updateChip: TextView
     private val accountLabel = accountLabel
 
     val list = VideoList(context)
@@ -66,6 +67,7 @@ class HomeScreen(
         addChip("검색") { navigator.openSearch() }
         tabs.forEachIndexed { index, _ -> addChip(tabs[index].label) { load(index) } }
         accountChip = addChip(accountLabel()) { navigator.openAccount() }
+        updateChip = addChip("업데이트") { navigator.openUpdate() }
 
         view.addView(chipScroll, LinearLayout.LayoutParams(-1, dp(44)))
         val body = FrameLayout(context).apply {
@@ -85,6 +87,15 @@ class HomeScreen(
         chips += chip
         chipActions += action
         return chip
+    }
+
+    /** [versionName] non-null: a newer release exists, so the last chip turns green. */
+    fun setUpdateAvailable(versionName: String?) {
+        updateChip.text = if (versionName == null) "업데이트" else "새 버전"
+        updateChip.setTextColor(
+            if (versionName == null) Hud.buttonText
+            else android.content.res.ColorStateList.valueOf(Hud.GREEN)
+        )
     }
 
     /** Reloads the current tab, e.g. after signing in or out. */

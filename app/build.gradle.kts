@@ -16,6 +16,17 @@ fun secret(name: String, env: String): String =
     (localProps.getProperty(name) ?: providers.gradleProperty(name).orNull
         ?: providers.environmentVariable(env).orNull ?: "").trim().replace("\"", "")
 
+// App version "X.Y.Z" from -PappVersion (the release workflow passes the git tag without "v").
+// versionCode = X*10000 + Y*100 + Z, so every release installs over the previous one.
+val appVersion = providers.gradleProperty("appVersion").orNull?.removePrefix("v") ?: "0.1.0"
+val appVersionCode = appVersion.split(".").map { it.toInt() }.let { (x, y, z) -> x * 10000 + y * 100 + z }
+
+// Release signing key, from the environment (GitHub Actions secrets). Without it, release
+// builds fall back to the debug key so local builds keep working.
+val releaseKeystore = providers.environmentVariable("SIGNING_KEYSTORE").orNull
+val releaseKeystorePassword = providers.environmentVariable("SIGNING_KEYSTORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("SIGNING_KEY_ALIAS").orNull
+
 kotlin {
     jvmToolchain(21)
 }
@@ -29,17 +40,29 @@ configure<ApplicationExtension> {
         // Rokid Glasses run Android 12 (API 31/32).
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = appVersionCode
+        versionName = appVersion
 
         buildConfigField("String", "GOOGLE_CLIENT_ID", "\"${secret("googleClientId", "GOOGLE_CLIENT_ID")}\"")
+        buildConfigField("String", "UPDATE_REPO", "\"ChoRockKim/rokid-youtube\"")
         buildConfigField("String", "GOOGLE_CLIENT_SECRET", "\"${secret("googleClientSecret", "GOOGLE_CLIENT_SECRET")}\"")
+    }
+
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeystorePassword // PKCS12: same as the store password
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 

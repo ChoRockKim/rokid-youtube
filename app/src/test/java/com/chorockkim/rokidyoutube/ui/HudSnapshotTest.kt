@@ -45,6 +45,7 @@ class HudSnapshotTest {
         override fun openSearch() {}
         override fun openPlayer(video: VideoItem) {}
         override fun openAccount() {}
+        override fun openUpdate() {}
         override fun exitApp() {}
         override fun setKeepScreenOn(on: Boolean) {}
         override fun back() {}
@@ -191,6 +192,28 @@ class HudSnapshotTest {
     }
 
     @Test
+    fun update_available() {
+        val screen = UpdateScreen(context, navigator, scope, updater = null)
+        screen.showAvailable(
+            com.chorockkim.rokidyoutube.update.Release(
+                "v0.2.1", "0.2.1", 201,
+                "## 바뀐 점\n- 영상 가림 필터 개선\n- 볼륨 조절이 더 부드러워졌어요",
+                "https://x/a.apk", 9_800_000, null, null
+            )
+        )
+        snapshot(screen.view, update = "0.2.1")
+    }
+
+    @Test
+    fun home_updateAvailable() {
+        val home = HomeScreen(context, navigator, scope, tabs(sampleVideos)) { "계정" }
+        home.list.thumbnailBinder = ::fakeThumbnail
+        home.setUpdateAvailable("0.2.1")
+        repeat(6) { home.onAction(GlassesInput.Action.NEXT) } // last chip
+        snapshot(home.view, update = "0.2.1")
+    }
+
+    @Test
     fun account_deviceCode() {
         val auth = com.chorockkim.rokidyoutube.auth.GoogleAuth(
             "id", "secret",
@@ -206,7 +229,7 @@ class HudSnapshotTest {
     }
 
     /** Full 480x640 glasses display; black above the band is transparent on the glasses. */
-    private fun snapshot(band: View, offline: Boolean = false) {
+    private fun snapshot(band: View, offline: Boolean = false, update: String? = null) {
         val root = FrameLayout(context).apply { setBackgroundColor(Color.BLACK) }
         root.addView(
             band,
@@ -216,6 +239,9 @@ class HudSnapshotTest {
             )
         )
         if (offline) root.addView(Hud.offlineNotice(context), Hud.offlineNoticeParams(context))
+        if (update != null) {
+            root.addView(Hud.updateNotice(context).apply { text = "새 버전 v$update" }, Hud.updateNoticeParams(context))
+        }
         root.addView(
             StatusIndicator(context).apply { show(82, charging = false, time = "14:32") },
             StatusIndicator.params(context)

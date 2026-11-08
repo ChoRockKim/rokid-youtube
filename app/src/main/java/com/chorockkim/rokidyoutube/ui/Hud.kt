@@ -96,6 +96,25 @@ object Hud {
         importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
 
+    /** Small green "새 버전 v0.2.1" pill at the left end of the row above the band. */
+    fun updateNotice(context: Context) = text(context, 12f, GREEN, bold = true).apply {
+        gravity = Gravity.CENTER
+        setPadding(context.dp(10), context.dp(3), context.dp(10), context.dp(3))
+        background = GradientDrawable().apply {
+            setColor(Color.TRANSPARENT)
+            setStroke(context.dp(1), GREEN)
+            cornerRadius = context.dp(10).toFloat()
+        }
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    fun updateNoticeParams(context: Context) = android.widget.FrameLayout.LayoutParams(
+        -2, -2, Gravity.BOTTOM or Gravity.START
+    ).apply {
+        bottomMargin = context.dp(BAND_HEIGHT_DP + 6)
+        marginStart = context.dp(12)
+    }
+
     /** Layout params for [offlineNotice] inside the full-screen root: centered, 6dp above the band. */
     fun offlineNoticeParams(context: Context) = android.widget.FrameLayout.LayoutParams(
         -2, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL

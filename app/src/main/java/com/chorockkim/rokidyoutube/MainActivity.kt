@@ -17,6 +17,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import com.chorockkim.rokidyoutube.data.VideoItem
 import com.chorockkim.rokidyoutube.data.YouTubeRepository
 import com.chorockkim.rokidyoutube.ui.AccountScreen
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity(), Navigator {
     private var recognizer: SpeechRecognizer? = null
     private var pendingVoice: ((String) -> Unit)? = null
     private lateinit var offlineBanner: android.widget.TextView
+    private lateinit var updateBanner: android.widget.TextView
     private var networkCallback: android.net.ConnectivityManager.NetworkCallback? = null
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
         if (it) listen() else toast("마이크 권한이 필요해요")
@@ -107,11 +109,14 @@ class MainActivity : ComponentActivity(), Navigator {
         offlineBanner = Hud.offlineNotice(this).apply { visibility = android.view.View.GONE }
         root.addView(offlineBanner, Hud.offlineNoticeParams(this))
         root.addView(com.chorockkim.rokidyoutube.ui.StatusIndicator(this), com.chorockkim.rokidyoutube.ui.StatusIndicator.params(this))
+        updateBanner = Hud.updateNotice(this).apply { visibility = android.view.View.GONE }
+        root.addView(updateBanner, Hud.updateNoticeParams(this))
         setContentView(root)
         watchNetwork()
 
         home = HomeScreen(this, this, lifecycleScope, homeTabs()) { if (app.auth.isSignedIn) "계정" else "로그인" }
         push(home)
+        checkForUpdate()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() { dispatchAction(GlassesInput.Action.BACK) }
@@ -189,6 +194,25 @@ class MainActivity : ComponentActivity(), Navigator {
 
     override fun openPlayer(video: VideoItem) {
         push(PlayerScreen(this, this, lifecycleScope, video, app.history))
+    }
+
+    override fun openUpdate() {
+        push(com.chorockkim.rokidyoutube.ui.UpdateScreen(this, this, lifecycleScope, app.updater, ::showUpdate))
+    }
+
+    /** Quiet check at start (at most every few hours); a new release shows the green pill + chip. */
+    private fun checkForUpdate() {
+        lifecycleScope.launch {
+            runCatching { app.updater.check() }.getOrNull()?.let { result ->
+                showUpdate((result as? com.chorockkim.rokidyoutube.update.Updater.Check.Available)?.release)
+            }
+        }
+    }
+
+    private fun showUpdate(release: com.chorockkim.rokidyoutube.update.Release?) {
+        home.setUpdateAvailable(release?.versionName)
+        updateBanner.text = release?.let { "새 버전 v${it.versionName}" }
+        updateBanner.visibility = if (release == null) android.view.View.GONE else android.view.View.VISIBLE
     }
 
     override fun openAccount() {
