@@ -72,13 +72,36 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
         return available?.let { Check.Available(it) } ?: Check.UpToDate
     }
 
+    /**
+     * An app this one can install or update: itself, or a companion app from the same server
+     * folder layout (e.g. rokid-lens, see [COMPANIONS]), signed with the same key as this app.
+     */
+    data class AppTarget(val packageName: String, val baseUrl: String, val label: String)
+
+    val self: AppTarget get() = AppTarget(context.packageName, BuildConfig.UPDATE_URL, "rokid-youtube")
+
+    /** Installed versionCode of [packageName], or null if it is not installed. */
+    fun installedVersion(packageName: String): Long? = runCatching {
+        val info = context.packageManager.getPackageInfo(packageName, 0)
+        @Suppress("DEPRECATION")
+        if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
+    }.getOrNull()
+
+    /** The latest release of [target] on its server, or null if nothing is uploaded. */
+    suspend fun latest(target: AppTarget): Release? = withContext(Dispatchers.IO) {
+        runCatching { get("${target.baseUrl}/latest") { code -> if (code == 404) throw NothingUploaded() } }
+            .map { Release.parse(it) }
+            .getOrElse { e -> if (e is NothingUploaded) null else throw e }
+    }
+
     /** Downloads and verifies the APK; [onProgress] gets 0..100 (or -1 if the size is unknown). */
-    suspend fun download(release: Release, onProgress: (Int) -> Unit): File = withContext(Dispatchers.IO) {
-        dir.deleteRecursively()
-        dir.mkdirs()
-        val file = File(dir, "rokid-youtube-${release.versionName}.apk")
+    suspend fun download(release: Release, target: AppTarget = self, onProgress: (Int) -> Unit): File = withContext(Dispatchers.IO) {
+        val targetDir = File(dir, target.packageName)
+        targetDir.deleteRecursively()
+        targetDir.mkdirs()
+        val file = File(targetDir, "${target.label}-${release.versionName}.apk")
         val digest = MessageDigest.getInstance("SHA-256")
-        http().newCall(Request.Builder().url("${BuildConfig.UPDATE_URL}/download").build()).execute().use { response ->
+        http().newCall(Request.Builder().url("${target.baseUrl}/download").build()).execute().use { response ->
             if (!response.isSuccessful) throw UpdateException("받기 실패 (HTTP ${response.code})")
             val body = response.body
             val total = body.contentLength().takeIf { it > 0 } ?: release.size
@@ -109,22 +132,24 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
             file.delete()
             throw UpdateException("파일이 손상됐어요 (SHA-256 불일치)")
         }
-        verifyApk(file, release)
+        verifyApk(file, release, target)
         file
     }
 
-    private fun verifyApk(file: File, release: Release) {
+    private fun verifyApk(file: File, release: Release, target: AppTarget) {
         val pm = context.packageManager
         val archive = archiveInfo(pm, file.path) ?: throw UpdateException("APK를 읽지 못했어요")
-        if (archive.packageName != context.packageName) throw UpdateException("다른 앱의 APK예요")
+        if (archive.packageName != target.packageName) throw UpdateException("다른 앱의 APK예요")
         @Suppress("DEPRECATION")
         val archiveCode = if (Build.VERSION.SDK_INT >= 28) archive.longVersionCode else archive.versionCode.toLong()
-        if (archiveCode <= BuildConfig.VERSION_CODE) throw UpdateException("지금 버전보다 새 버전이 아니에요")
+        val installedCode = installedVersion(target.packageName) ?: -1L
+        if (archiveCode <= installedCode) throw UpdateException("지금 버전보다 새 버전이 아니에요")
         if (archiveCode != release.versionCode.toLong()) throw UpdateException("릴리스와 APK 버전이 달라요")
+        // Always compared with this app's own key: a companion app must come from the same signer.
         val installed = signatures(pm.getPackageInfo(context.packageName, signingFlags()))
         val incoming = signatures(archive)
         if (installed.isEmpty() || installed != incoming) {
-            throw UpdateException("서명 키가 달라서 덮어 설치할 수 없어요")
+            throw UpdateException("서명 키가 달라서 설치할 수 없어요")
         }
     }
 
@@ -135,10 +160,10 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
      * Starts a system install session. The system shows its own confirmation; the result arrives
      * in [InstallResultReceiver]. On success Android replaces and restarts nothing: the app closes.
      */
-    suspend fun install(apk: File) = withContext(Dispatchers.IO) {
+    suspend fun install(apk: File, packageName: String = context.packageName) = withContext(Dispatchers.IO) {
         val installer = context.packageManager.packageInstaller
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
-            setAppPackageName(context.packageName)
+            setAppPackageName(packageName)
             if (Build.VERSION.SDK_INT >= 31) {
                 setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
             }
@@ -170,6 +195,18 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
     }
 
     companion object {
+        /**
+         * Glasses apps this one installs when they are missing, so one start of rokid-youtube is
+         * enough to get them (they update themselves afterwards). Android always asks the
+         * wearer to confirm the first install of a new app.
+         */
+        val COMPANIONS = listOf(
+            "com.chorockkim.rokidlens" to "rokid-lens"
+        )
+
+        /** Server folder of a companion: same server as this app, `/apps/<label>`. */
+        fun companionUrl(selfUrl: String, label: String): String = selfUrl.substringBeforeLast('/') + "/" + label
+
         const val CHECK_EVERY_MS = 6 * 60 * 60 * 1000L
         private const val KEY_LAST_CHECK = "lastCheck"
 
