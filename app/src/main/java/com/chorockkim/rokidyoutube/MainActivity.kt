@@ -245,25 +245,33 @@ class MainActivity : ComponentActivity(), Navigator {
     }
 
     /**
-     * Installs the glasses apps in [Updater.COMPANIONS] that are not on the glasses yet (e.g.
-     * rokid-lens), from the same server, signed with the same key. Android shows its install
+     * Installs the glasses apps in [Updater.COMPANIONS] that are not on the glasses yet, or are
+     * older than the server's (e.g. rokid-lens), from the same server, signed with the same key. Android shows its install
      * confirmation once for a new app; afterwards the app updates itself.
      */
     private suspend fun installCompanions() {
         val updater = app.updater
         for ((pkg, label) in com.chorockkim.rokidyoutube.update.Updater.COMPANIONS) {
-            if (updater.installedVersion(pkg) != null) continue
+            val name = label.removePrefix("rokid-").replaceFirstChar { it.uppercase() }
+            val installed = updater.installedVersion(pkg)
             val target = com.chorockkim.rokidyoutube.update.Updater.AppTarget(
                 pkg, com.chorockkim.rokidyoutube.update.Updater.companionUrl(updater.self.baseUrl, label), label
             )
-            val release = runCatching { updater.latest(target) }.getOrNull() ?: continue
-            val name = label.removePrefix("rokid-").replaceFirstChar { it.uppercase() }
+            // Not silent any more: a failed check shows why, so it can be reported from the glasses.
+            val release = runCatching { updater.latest(target) }.getOrElse {
+                updateBanner.text = "$name 확인 실패 · ${it.message ?: it.javaClass.simpleName}"
+                updateBanner.visibility = android.view.View.VISIBLE
+                continue
+            } ?: continue
+            // Missing, or older than the server's: install / update it (the companion updates
+            // itself too once it runs, but it may not have the install permission yet).
+            if (installed != null && installed >= release.versionCode) continue
             updateBanner.visibility = android.view.View.VISIBLE
             if (!askInstallPermission()) {
                 updateBanner.text = "$name 설치 · 설치 허용을 켜면 이어서 해요"
                 return
             }
-            updateBanner.text = "$name 받는 중"
+            updateBanner.text = if (installed == null) "$name 받는 중" else "$name 업데이트 받는 중"
             val apk = runCatching {
                 updater.download(release, target) { percent ->
                     if (percent >= 0) updateBanner.text = "$name 받는 중 $percent%"
@@ -279,7 +287,7 @@ class MainActivity : ComponentActivity(), Navigator {
                             "$name 설치 실패 · ${result.message}"
                         com.chorockkim.rokidyoutube.update.InstallResultReceiver.Result.WaitingForUser ->
                             "$name 설치 확인 창에서 '설치'를 눌러 주세요"
-                        else -> "$name 설치 완료"
+                        else -> "$name v${release.versionName} 설치 완료"
                     }
                 }
             }
