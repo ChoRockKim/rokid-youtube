@@ -22,13 +22,4 @@ class ReleaseTest {
         assertNull(Release.parse("""{"versionCode":200,"sha256":"$sha"}"""))
         assertNull(Release.parse("not json"))
     }
-
-    @Test
-    fun companionsLiveNextToThisAppOnTheServer() {
-        assertEquals(
-            "https://server-v2-production-8f97.up.railway.app/apps/rokid-lens",
-            Updater.companionUrl("https://server-v2-production-8f97.up.railway.app/apps/rokid-youtube", "rokid-lens")
-        )
-        assertEquals(listOf("com.chorockkim.rokidlens" to "rokid-lens"), Updater.COMPANIONS)
-    }
 }

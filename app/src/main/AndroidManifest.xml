@@ -20,9 +20,6 @@
 
     <queries>
         <package android:name="com.chorockkim.conversate.wifihelper" />
-        <!-- Companion apps installed when missing (update/Updater.kt COMPANIONS): Android 11+ only
-             reports whether they are installed if they are listed here. -->
-        <package android:name="com.chorockkim.rokidlens" />
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>

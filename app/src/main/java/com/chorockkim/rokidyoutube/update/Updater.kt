@@ -72,10 +72,7 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
         return available?.let { Check.Available(it) } ?: Check.UpToDate
     }
 
-    /**
-     * An app this one can install or update: itself, or a companion app from the same server
-     * folder layout (e.g. rokid-lens, see [COMPANIONS]), signed with the same key as this app.
-     */
+    /** The app being updated (this one), with its server folder. */
     data class AppTarget(val packageName: String, val baseUrl: String, val label: String)
 
     val self: AppTarget get() = AppTarget(context.packageName, BuildConfig.UPDATE_URL, "rokid-youtube")
@@ -86,13 +83,6 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
         @Suppress("DEPRECATION")
         if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
     }.getOrNull()
-
-    /** The latest release of [target] on its server, or null if nothing is uploaded. */
-    suspend fun latest(target: AppTarget): Release? = withContext(Dispatchers.IO) {
-        runCatching { get("${target.baseUrl}/latest") { code -> if (code == 404) throw NothingUploaded() } }
-            .map { Release.parse(it) }
-            .getOrElse { e -> if (e is NothingUploaded) null else throw e }
-    }
 
     /** Downloads and verifies the APK; [onProgress] gets 0..100 (or -1 if the size is unknown). */
     suspend fun download(release: Release, target: AppTarget = self, onProgress: (Int) -> Unit): File = withContext(Dispatchers.IO) {
@@ -145,7 +135,6 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
         val installedCode = installedVersion(target.packageName) ?: -1L
         if (archiveCode <= installedCode) throw UpdateException("지금 버전보다 새 버전이 아니에요")
         if (archiveCode != release.versionCode.toLong()) throw UpdateException("릴리스와 APK 버전이 달라요")
-        // Always compared with this app's own key: a companion app must come from the same signer.
         val installed = signatures(pm.getPackageInfo(context.packageName, signingFlags()))
         val incoming = signatures(archive)
         if (installed.isEmpty() || installed != incoming) {
@@ -199,18 +188,6 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
     }
 
     companion object {
-        /**
-         * Glasses apps this one installs when they are missing, so one start of rokid-youtube is
-         * enough to get them (they update themselves afterwards). Android always asks the
-         * wearer to confirm the first install of a new app.
-         */
-        val COMPANIONS = listOf(
-            "com.chorockkim.rokidlens" to "rokid-lens"
-        )
-
-        /** Server folder of a companion: same server as this app, `/apps/<label>`. */
-        fun companionUrl(selfUrl: String, label: String): String = selfUrl.substringBeforeLast('/') + "/" + label
-
         const val CHECK_EVERY_MS = 6 * 60 * 60 * 1000L
         private const val KEY_LAST_CHECK = "lastCheck"
 
