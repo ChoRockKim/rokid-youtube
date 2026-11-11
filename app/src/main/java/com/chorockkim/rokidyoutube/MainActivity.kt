@@ -212,9 +212,9 @@ class MainActivity : ComponentActivity(), Navigator {
                 installCompanions()
                 return@launch
             }
-            if (!updater.canInstall()) {
-                // Needs "install unknown apps" once (adb: appops set <pkg> REQUEST_INSTALL_PACKAGES allow).
-                updateBanner.text = "새 버전 v${release.versionName} · 설치 허용 필요"
+            if (!askInstallPermission()) {
+                // Needs "install unknown apps" once: the system screen opens, then this resumes.
+                updateBanner.text = "새 버전 v${release.versionName} · 설치 허용을 켜면 이어서 해요"
                 return@launch
             }
             updateBanner.text = "업데이트 v${release.versionName} 받는 중"
@@ -259,8 +259,8 @@ class MainActivity : ComponentActivity(), Navigator {
             val release = runCatching { updater.latest(target) }.getOrNull() ?: continue
             val name = label.removePrefix("rokid-").replaceFirstChar { it.uppercase() }
             updateBanner.visibility = android.view.View.VISIBLE
-            if (!updater.canInstall()) {
-                updateBanner.text = "$name 설치하려면 설치 허용 필요"
+            if (!askInstallPermission()) {
+                updateBanner.text = "$name 설치 · 설치 허용을 켜면 이어서 해요"
                 return
             }
             updateBanner.text = "$name 받는 중"
@@ -328,8 +328,31 @@ class MainActivity : ComponentActivity(), Navigator {
         stack.lastOrNull()?.onHidden()
     }
 
+    /** Waiting for the wearer to allow installs in the system screen opened by [askInstallPermission]. */
+    private var waitingForInstallPermission = false
+    private var askedInstallPermission = false
+
+    /**
+     * True if this app may install APKs. Otherwise opens the system "이 출처 허용" screen for it,
+     * once per app start, and the update resumes when the wearer comes back with it allowed.
+     */
+    private fun askInstallPermission(): Boolean {
+        if (app.updater.canInstall()) return true
+        if (!askedInstallPermission) {
+            askedInstallPermission = true
+            waitingForInstallPermission = runCatching {
+                startActivity(app.updater.installPermissionIntent())
+            }.isSuccess
+        }
+        return false
+    }
+
     override fun onStart() {
         super.onStart()
+        if (waitingForInstallPermission && app.updater.canInstall()) {
+            waitingForInstallPermission = false
+            checkForUpdate()
+        }
         wifiEnabler.start()
         stack.lastOrNull()?.onShown()
     }

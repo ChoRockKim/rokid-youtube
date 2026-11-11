@@ -156,6 +156,10 @@ class Updater(private val context: Context, private val http: () -> OkHttpClient
     /** Whether the system lets this app install APKs (the "unknown sources" toggle for this app). */
     fun canInstall(): Boolean = context.packageManager.canRequestPackageInstalls()
 
+    /** The system screen where the wearer allows this app to install apps ("이 출처 허용"). */
+    fun installPermissionIntent(): Intent =
+        Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, android.net.Uri.parse("package:${context.packageName}"))
+
     /**
      * Starts a system install session. The system shows its own confirmation; the result arrives
      * in [InstallResultReceiver]. On success Android replaces and restarts nothing: the app closes.
